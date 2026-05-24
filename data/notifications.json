@@ -1,0 +1,38 @@
+[
+  {
+    "id": "6a11bd5eae06b6f1ea4e233c",
+    "userId": "mhbibli127@gmail.com",
+    "type": "login",
+    "title": "Welcome back!",
+    "message": "You have successfully signed in to SmartCV.",
+    "read": false,
+    "createdAt": "2026-05-23T14:44:46.060Z"
+  },
+  {
+    "id": "6a11a9874a0fd1ec4b38fe25",
+    "userId": "mhbibli127@gmail.com",
+    "type": "login",
+    "title": "Welcome back!",
+    "message": "You have successfully signed in to SmartCV.",
+    "read": false,
+    "createdAt": "2026-05-23T13:20:07.974Z"
+  },
+  {
+    "id": "6a118a3daad9d2372070cf83",
+    "userId": "mhbibli127@gmail.com",
+    "type": "login",
+    "title": "Welcome back!",
+    "message": "You have successfully signed in to SmartCV.",
+    "read": false,
+    "createdAt": "2026-05-23T11:06:37.183Z"
+  },
+  {
+    "id": "6a117e7eaad9d2372070cf82",
+    "userId": "mhbibli127@gmail.com",
+    "type": "login",
+    "title": "Welcome back!",
+    "message": "You have successfully signed in to SmartCV.",
+    "read": false,
+    "createdAt": "2026-05-23T10:16:30.781Z"
+  }
+]

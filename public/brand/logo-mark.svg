@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="SmartCV">
+  <defs>
+    <linearGradient id="scv-grad" x1="8" y1="6" x2="40" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+  </defs>
+  <rect width="48" height="48" rx="12" fill="url(#scv-grad)"/>
+  <path d="M15 14h18a2 2 0 0 1 2 2v20a2 2 0 0 1-2 2H15a2 2 0 0 1-2-2V16a2 2 0 0 1 2-2z" fill="white" fill-opacity="0.95"/>
+  <path d="M17 20h14M17 24h14M17 28h9" stroke="#4F46E5" stroke-width="2" stroke-linecap="round"/>
+  <path d="M30 11l2.2 4.4 4.9.7-3.5 3.4.8 4.9L30 21.8l-4.4 2.3.8-4.9-3.5-3.4 4.9-.7L30 11z" fill="#FBBF24"/>
+</svg>
