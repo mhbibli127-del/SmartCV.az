@@ -9,10 +9,7 @@ let stripeSingleton: Stripe | null = null;
 
 /**
  * Stripe client accessor.
- *
- * Hardening: if STRIPE_SECRET_KEY is missing or a placeholder, this throws
- * only when called. Stripe API routes call isStripeConfigured() first and
- * return 503 with a clear message before reaching here.
+ * Never instantiates at module load — safe for Vercel build.
  */
 export function getStripe(): Stripe {
   const key = getStripeSecretKey();
@@ -20,7 +17,7 @@ export function getStripe(): Stripe {
   if (!key) {
     throw new Error(
       "[stripe] STRIPE_SECRET_KEY is missing or a placeholder. " +
-        "Set a real Stripe secret key in .env.local."
+        "Set a real Stripe secret key in environment variables."
     );
   }
 
@@ -38,7 +35,6 @@ export function isStripeConfigured(): boolean {
   return getStripeSecretKey() !== null;
 }
 
-/** Resolve Stripe Price ID from a lookup key (Stripe best practice) */
 export async function resolvePriceIdByLookupKey(
   lookupKey: StripeLookupKey
 ): Promise<string> {
@@ -88,10 +84,5 @@ export function assertValidLookupKey(
   }
 }
 
-/** @deprecated Use getStripe() — kept for legacy /api/stripe/subscribe */
-const legacyKey = getStripeSecretKey();
-const legacyStripe = legacyKey
-  ? new Stripe(legacyKey, { apiVersion: "2022-11-15" as never })
-  : null;
-
-export default legacyStripe as Stripe;
+/** @deprecated Use getStripe() */
+export default null as unknown as Stripe;

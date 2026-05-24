@@ -1,92 +1,145 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import { PrismaAdapter } from "@next-auth/prisma-adapter";
-import prisma from "@/lib/prisma";
+import { isBuildPhase } from "@/lib/build";
+import { getNextAuthSecret, getNextAuthUrl } from "@/lib/env";
 import { isGoogleOAuthConfigured } from "@/lib/google-oauth";
-import {
-  createNotification,
-  notificationMessages,
-} from "@/lib/notifications";
 
-export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma as Parameters<typeof PrismaAdapter>[0]),
-  providers: isGoogleOAuthConfigured()
-    ? [
-        GoogleProvider({
-          clientId: process.env.GOOGLE_CLIENT_ID!.trim(),
-          clientSecret: process.env.GOOGLE_CLIENT_SECRET!.trim(),
-          allowDangerousEmailAccountLinking: true,
-        }),
-      ]
-    : [],
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
-  session: {
-    strategy: "database",
-    maxAge: 7 * 24 * 60 * 60,
-    updateAge: 24 * 60 * 60,
-  },
-  events: {
-    async signIn({ user, account }) {
-      if (user.email && account?.provider === "google") {
-        await createNotification({
-          userId: user.email,
-          type: "login",
-          title: notificationMessages.login.title,
-          message: notificationMessages.login.message,
-        }).catch(() => {
-          /* non-blocking */
-        });
-      }
-    },
-  },
-  callbacks: {
-    async signIn({ user, account }) {
-      if (account?.provider !== "google" || !user.email) return true;
+let cachedOptions: NextAuthOptions | null = null;
 
-      const email = user.email.toLowerCase().trim();
-      try {
-        await prisma.user.upsert({
-          where: { email },
-          create: {
-            email,
-            name: user.name ?? email.split("@")[0],
-            image: user.image ?? null,
-            emailVerified: new Date(),
-            provider: "google",
-          },
-          update: {
-            name: user.name ?? undefined,
-            image: user.image ?? undefined,
-            emailVerified: new Date(),
-            provider: "google",
-          },
-        });
-      } catch (err) {
-        console.error("[nextauth] Google user upsert failed", err);
-      }
-      return true;
+function buildProviders() {
+  if (!isGoogleOAuthConfigured()) return [];
+
+  return [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!.trim(),
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!.trim(),
+      allowDangerousEmailAccountLinking: true,
+    }),
+  ];
+}
+
+/** Lazy Prisma import — never loaded during Next.js static build. */
+async function upsertGoogleUser(params: {
+  email: string;
+  name?: string | null;
+  image?: string | null;
+}) {
+  if (isBuildPhase()) return;
+
+  const { default: prisma } = await import("@/lib/prisma");
+  const email = params.email.toLowerCase().trim();
+
+  await prisma.user.upsert({
+    where: { email },
+    create: {
+      email,
+      name: params.name ?? email.split("@")[0],
+      image: params.image ?? null,
+      emailVerified: new Date(),
+      provider: "google",
     },
-    async redirect({ url, baseUrl }) {
-      if (url.startsWith(baseUrl)) return url;
-      if (url.startsWith("/")) return `${baseUrl}${url}`;
-      return `${baseUrl}/dashboard`;
+    update: {
+      name: params.name ?? undefined,
+      image: params.image ?? undefined,
+      emailVerified: new Date(),
+      provider: "google",
     },
-    async session({ session, user }) {
-      if (session.user && user) {
-        (session.user as { id?: string }).id = String(user.id);
-        session.user.name = user.name ?? session.user.name;
-        session.user.email = user.email ?? session.user.email;
-        session.user.image = user.image ?? session.user.image;
-      }
-      return session;
+  });
+}
+
+async function notifyGoogleLogin(email: string) {
+  if (isBuildPhase()) return;
+
+  try {
+    const { createNotification, notificationMessages } = await import(
+      "@/lib/notifications"
+    );
+    await createNotification({
+      userId: email,
+      type: "login",
+      title: notificationMessages.login.title,
+      message: notificationMessages.login.message,
+    });
+  } catch {
+    /* non-blocking */
+  }
+}
+
+/**
+ * NextAuth configuration.
+ *
+ * Uses JWT sessions (not PrismaAdapter) so:
+ * - Vercel builds never open a DB connection during page-data collection
+ * - Serverless deploys work without SQLite file persistence
+ * - Google users are still persisted via upsertGoogleUser() in signIn callback
+ */
+export function getAuthOptions(): NextAuthOptions {
+  if (cachedOptions) return cachedOptions;
+
+  cachedOptions = {
+    providers: buildProviders(),
+    pages: {
+      signIn: "/login",
+      error: "/login",
     },
-  },
-  secret:
-    process.env.NEXTAUTH_SECRET?.trim() ||
-    process.env.JWT_SECRET?.trim() ||
-    "dev-only-change-me-in-production",
-  debug: process.env.NODE_ENV === "development",
-};
+    // JWT strategy — no PrismaAdapter (build-safe + Vercel-compatible)
+    session: {
+      strategy: "jwt",
+      maxAge: 7 * 24 * 60 * 60,
+      updateAge: 24 * 60 * 60,
+    },
+    events: {
+      async signIn({ user, account }) {
+        if (user.email && account?.provider === "google") {
+          await notifyGoogleLogin(user.email);
+        }
+      },
+    },
+    callbacks: {
+      async signIn({ user, account }) {
+        if (account?.provider !== "google" || !user.email) return true;
+
+        try {
+          await upsertGoogleUser({
+            email: user.email,
+            name: user.name,
+            image: user.image,
+          });
+        } catch (err) {
+          console.error("[nextauth] Google user upsert failed", err);
+        }
+        return true;
+      },
+      async redirect({ url, baseUrl }) {
+        const resolvedBase = baseUrl || getNextAuthUrl();
+        if (url.startsWith(resolvedBase)) return url;
+        if (url.startsWith("/")) return `${resolvedBase}${url}`;
+        return `${resolvedBase}/dashboard`;
+      },
+      async jwt({ token, user, account }) {
+        if (user?.email) {
+          token.email = user.email.toLowerCase();
+          token.name = user.name;
+          token.picture = user.image;
+        }
+        if (account?.provider === "google") {
+          token.provider = "google";
+        }
+        return token;
+      },
+      async session({ session, token }) {
+        if (session.user) {
+          if (token.email) session.user.email = String(token.email);
+          if (token.name) session.user.name = String(token.name);
+          if (token.picture) session.user.image = String(token.picture);
+          (session.user as { id?: string }).id = token.sub;
+        }
+        return session;
+      },
+    },
+    secret: getNextAuthSecret(),
+    debug: process.env.NODE_ENV === "development",
+  };
+
+  return cachedOptions;
+}

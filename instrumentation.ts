@@ -8,8 +8,14 @@
  * Docs: https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
  */
 export async function register() {
-  if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { assertServerEnv } = await import("@/lib/env");
-    assertServerEnv();
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  // Skip env banner during static build — avoids noisy logs and side effects.
+  if (
+    process.env.NEXT_PHASE === "phase-production-build" ||
+    process.env.NEXT_PHASE === "phase-export"
+  ) {
+    return;
   }
+  const { assertServerEnv } = await import("@/lib/env");
+  assertServerEnv();
 }

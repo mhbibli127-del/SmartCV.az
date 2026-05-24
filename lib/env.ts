@@ -3,18 +3,14 @@
  *
  * IMPORTANT: Never import this from client components. All helpers in this
  * module read process.env and return secret values where appropriate.
- *
- * Public helpers:
- *   - getAppUrl()                  -> string (safe, public)
- *   - getStripeSecretKey()         -> string | null
- *   - getStripeWebhookSecret()     -> string | null
- *   - getMongoUri()                -> string | null
- *   - getJwtSecret()               -> string  (throws in prod if missing)
- *   - getOpenAIKey()               -> string | null
- *   - getDatabaseUrl()             -> string  (defaults to local sqlite)
- *   - assertServerEnv()            -> EnvReport  (one-shot startup banner)
- *   - requireEnv(name)             -> string  (throws if missing)
  */
+
+import { isBuildPhase } from "@/lib/build";
+
+function sqliteFileUrl(relativeFile: string): string {
+  const normalized = relativeFile.replace(/^\.\//, "");
+  return `file:${process.cwd()}/prisma/${normalized}`;
+}
 
 const PLACEHOLDER_PATTERNS = [
   "your_",
@@ -73,8 +69,6 @@ export function getOpenAIKey(): string | null {
   return readSecret("OPENAI_API_KEY");
 }
 
-import path from "path";
-
 /**
  * SQLite URL for Prisma. Relative `file:./dev.db` is resolved against
  * `prisma/` (Prisma convention). Rejects accidental MongoDB URIs in
@@ -83,24 +77,27 @@ import path from "path";
 export function getDatabaseUrl(): string {
   const raw = process.env.DATABASE_URL?.trim();
 
+  if (raw?.startsWith("postgresql://") || raw?.startsWith("postgres://")) {
+    return raw;
+  }
+
   if (raw?.startsWith("mongodb")) {
     // eslint-disable-next-line no-console
     console.warn(
       "[env] DATABASE_URL looks like MongoDB — using prisma/dev.db instead. " +
         "Set MONGODB_URI for MongoDB and DATABASE_URL=file:./dev.db for Prisma."
     );
-    return `file:${path.join(process.cwd(), "prisma", "dev.db")}`;
+    return sqliteFileUrl("dev.db");
   }
 
   if (raw?.startsWith("file:")) {
     const filePath = raw.slice("file:".length);
-    if (path.isAbsolute(filePath)) return raw;
-    // Prisma resolves relative sqlite paths from the schema directory.
+    if (filePath.startsWith("/") || /^[A-Za-z]:/.test(filePath)) return raw;
     const normalized = filePath.replace(/^\.\//, "");
-    return `file:${path.join(process.cwd(), "prisma", normalized)}`;
+    return sqliteFileUrl(normalized);
   }
 
-  return `file:${path.join(process.cwd(), "prisma", "dev.db")}`;
+  return sqliteFileUrl("dev.db");
 }
 
 /**
@@ -132,6 +129,43 @@ export function getJwtSecret(): string {
     );
   }
   return DEV_JWT_FALLBACK;
+}
+
+/** NextAuth signing secret — never throws during build. */
+export function getNextAuthSecret(): string {
+  const secret = readSecret("NEXTAUTH_SECRET") ?? readSecret("JWT_SECRET");
+  if (secret) return secret;
+
+  if (isBuildPhase()) {
+    return "build-phase-placeholder-not-used-at-runtime";
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[env] NEXTAUTH_SECRET is missing in production. " +
+        "Set NEXTAUTH_SECRET in Vercel environment variables."
+    );
+    return "missing-nextauth-secret-configure-in-vercel";
+  }
+
+  if (!jwtFallbackWarned) {
+    jwtFallbackWarned = true;
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[env] NEXTAUTH_SECRET is not configured. Using a development-only fallback."
+    );
+  }
+  return DEV_JWT_FALLBACK;
+}
+
+export function getNextAuthUrl(): string {
+  return (
+    process.env.NEXTAUTH_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+    "http://localhost:3000"
+  );
 }
 
 export interface EnvReport {

@@ -1,4 +1,4 @@
-import { getAppUrl } from "@/lib/env";
+import { getNextAuthUrl } from "@/lib/env";
 
 /** True when Google OAuth credentials are present and not placeholders. */
 export function isGoogleOAuthConfigured(): boolean {
@@ -11,7 +11,7 @@ export function isGoogleOAuthConfigured(): boolean {
 
 /** NextAuth callback URL — register this in Google Cloud Console. */
 export function getGoogleCallbackUrl(): string {
-  const base = process.env.NEXTAUTH_URL?.trim() || getAppUrl();
+  const base = getNextAuthUrl();
   return `${base.replace(/\/$/, "")}/api/auth/callback/google`;
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-options";
+import { getAuthOptions } from "@/lib/auth-options";
 import { DatabaseOperations } from "@/lib/models";
 import {
   CV_SAMPLE_TOTAL,
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
 // POST /api/templates — Track template view, download, or selection
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(getAuthOptions());
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

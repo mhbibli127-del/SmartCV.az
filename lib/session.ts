@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth-options";
+import { getAuthOptions } from "@/lib/auth-options";
 import { verifyAccessToken } from "@/lib/auth";
 import { verifySessionToken } from "@/lib/token";
 
@@ -15,7 +15,7 @@ export type AuthenticatedUser = {
 export async function getAuthenticatedUser(
   req?: NextRequest
 ): Promise<AuthenticatedUser | null> {
-  const session = await getServerSession(authOptions);
+  const session = await getServerSession(getAuthOptions());
   if (session?.user?.email) {
     return {
       email: session.user.email,

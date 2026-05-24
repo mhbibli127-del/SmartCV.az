@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
+import { getAuthOptions } from '@/lib/auth-options';
 import { DatabaseOperations } from '@/lib/models';
 
 export const dynamic = 'force-dynamic';
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const session = await getServerSession(authOptions);
+    const session = await getServerSession(getAuthOptions());
     
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
     let userId = 'dev-user';
     
     if (process.env.NODE_ENV === 'production') {
-      const session = await getServerSession(authOptions);
+      const session = await getServerSession(getAuthOptions());
       
       if (!session?.user?.email) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
