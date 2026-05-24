@@ -61,8 +61,55 @@ export function getStripeWebhookSecret(): string | null {
 }
 
 export function getMongoUri(): string | null {
-  // Accept either MONGODB_URI (preferred) or MONGODB_URL (legacy).
-  return readSecret("MONGODB_URI") ?? readSecret("MONGODB_URL");
+  try {
+    return requireMongoUri();
+  } catch {
+    return null;
+  }
+}
+
+/** Redact credentials from a MongoDB URI for safe logging. */
+export function maskMongoUri(uri: string): string {
+  return uri.replace(/\/\/([^@/]+)@/, "//***@");
+}
+
+/**
+ * Normalize common misconfigurations (e.g. duplicated "MONGODB_URI=" prefix).
+ */
+function normalizeMongoUri(raw: string): string {
+  let uri = raw.trim();
+  while (/^MONGODB_URI=/i.test(uri)) {
+    uri = uri.replace(/^MONGODB_URI=/i, "").trim();
+  }
+  return uri;
+}
+
+/**
+ * Returns a validated MongoDB connection string.
+ * @throws {Error} "MONGODB_URI is not defined" when missing/empty/placeholder
+ * @throws {Error} when URI scheme is not mongodb:// or mongodb+srv://
+ */
+export function requireMongoUri(): string {
+  const raw = process.env.MONGODB_URI?.trim();
+
+  if (!raw) {
+    throw new Error("MONGODB_URI is not defined");
+  }
+
+  const uri = normalizeMongoUri(raw);
+
+  if (!uri || isPlaceholder(uri)) {
+    throw new Error("MONGODB_URI is not defined");
+  }
+
+  if (!/^mongodb(\+srv)?:\/\//i.test(uri)) {
+    throw new Error(
+      `Invalid MongoDB URI scheme — expected mongodb:// or mongodb+srv://. ` +
+        `Got: ${maskMongoUri(uri)}`
+    );
+  }
+
+  return uri;
 }
 
 export function getOpenAIKey(): string | null {

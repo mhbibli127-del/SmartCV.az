@@ -1,54 +1,89 @@
 import mongoose from "mongoose";
-import { getMongoUri } from "@/lib/env";
+import { maskMongoUri, requireMongoUri } from "@/lib/env";
 
-let warnedMissingEnv = false;
+/**
+ * Vercel serverless-safe Mongoose connection cache.
+ * Reuses a single connection across warm lambda invocations.
+ */
+interface MongooseCache {
+  conn: typeof mongoose | null;
+  promise: Promise<typeof mongoose> | null;
+}
 
-let cached: { conn: typeof mongoose | null; promise: Promise<typeof mongoose> | null } = {
+declare global {
+  // eslint-disable-next-line no-var
+  var __mongooseCache: MongooseCache | undefined;
+}
+
+const cached: MongooseCache = global.__mongooseCache ?? {
   conn: null,
   promise: null,
 };
 
-export async function connectDB(): Promise<typeof mongoose> {
-  const MONGODB_URL = getMongoUri();
-  if (!MONGODB_URL) {
-    if (!warnedMissingEnv) {
-      warnedMissingEnv = true;
-      // eslint-disable-next-line no-console
-      console.warn(
-        "[mongodb] MONGODB_URI is not set or contains a placeholder. " +
-          "MongoDB-backed features will be unavailable."
-      );
-    }
-    throw new Error(
-      "[mongodb] MONGODB_URI is not configured. Set it in .env.local."
-    );
-  }
+if (!global.__mongooseCache) {
+  global.__mongooseCache = cached;
+}
 
-  const readyState = mongoose.connection.readyState;
-  if (readyState === 1 && cached.conn) {
-    console.log("🟢 MongoDB already connected");
+/**
+ * Connect to MongoDB using MONGODB_URI from environment.
+ * - Validates URI before connecting
+ * - Reuses existing connection when already connected
+ * - Deduplicates concurrent connect attempts
+ */
+export async function connectDB(): Promise<typeof mongoose> {
+  const uri = requireMongoUri();
+  const safeUri = maskMongoUri(uri);
+
+  if (cached.conn && mongoose.connection.readyState === 1) {
+    // eslint-disable-next-line no-console
+    console.log("[mongodb] Reusing existing connection", {
+      host: mongoose.connection.host,
+      db: mongoose.connection.name,
+    });
     return cached.conn;
   }
 
   if (cached.promise) {
+    // eslint-disable-next-line no-console
+    console.log("[mongodb] Awaiting in-flight connection...");
     return cached.promise;
   }
 
+  // eslint-disable-next-line no-console
+  console.log("[mongodb] Connecting...", { uri: safeUri });
+
   cached.promise = (async () => {
     try {
-      console.log("🔵 Trying to connect MongoDB...");
       mongoose.set("strictQuery", true);
 
-      await mongoose.connect(MONGODB_URL, {
-        dbName: mongoose.connection.name || undefined,
-      } as mongoose.ConnectOptions);
+      const connection = await mongoose.connect(uri, {
+        bufferCommands: false,
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 10_000,
+        socketTimeoutMS: 45_000,
+      });
 
-      console.log("🟢 MongoDB connected successfully");
-      cached.conn = mongoose;
-      return mongoose;
+      cached.conn = connection;
+
+      // eslint-disable-next-line no-console
+      console.log("[mongodb] Connected successfully", {
+        host: mongoose.connection.host,
+        db: mongoose.connection.name,
+        uri: safeUri,
+      });
+
+      return connection;
     } catch (err) {
-      console.error("🔴 MongoDB connection error", err);
       cached.promise = null;
+      cached.conn = null;
+
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-console
+      console.error("[mongodb] Connection failed", {
+        uri: safeUri,
+        error: message,
+      });
+
       throw err;
     }
   })();
@@ -57,17 +92,15 @@ export async function connectDB(): Promise<typeof mongoose> {
 }
 
 /**
- * Compatibility export expected by lib/notifications.ts and lib/models.ts.
- *
- * This returns a native MongoDB DB handle via mongoose's underlying connection.
+ * Returns the native MongoDB Db handle (used by lib/models.ts, lib/notifications.ts).
  */
 export async function getDatabase() {
-  const m = await connectDB();
-  // mongoose.connection.db is the native mongodb Db instance
-  const db = m.connection.db;
+  await connectDB();
+
+  const db = mongoose.connection.db;
   if (!db) {
-    throw new Error("MongoDB native Db handle is not available yet");
+    throw new Error("[mongodb] Database handle unavailable after connect");
   }
+
   return db;
 }
-
