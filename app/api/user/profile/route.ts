@@ -3,6 +3,8 @@ import { getAuthenticatedUser } from "@/lib/session";
 import { DatabaseOperations } from "@/lib/models";
 import prisma from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const user = await getAuthenticatedUser(req);

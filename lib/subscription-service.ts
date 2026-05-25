@@ -84,13 +84,10 @@ export async function syncUserFromStripeSubscription(
     stripePriceLookupKey: lookupKey,
     subscriptionStatus: subscription.status,
     subscriptionPlan: planTier,
-    // Stripe SDK typings differ by version; compute defensively.
-    subscriptionCurrentPeriodEnd:
-      // @ts-expect-error older/newer stripe typings
-      subscription.current_period_end
-        ? // @ts-expect-error older/newer stripe typings
-          new Date(subscription.current_period_end * 1000)
-        : null,
+    subscriptionCurrentPeriodEnd: (() => {
+      const periodEnd = (subscription as { current_period_end?: number }).current_period_end;
+      return typeof periodEnd === "number" ? new Date(periodEnd * 1000) : null;
+    })(),
   });
 }
 
