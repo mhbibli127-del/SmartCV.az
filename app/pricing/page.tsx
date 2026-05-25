@@ -1,108 +1,100 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, type ReactNode } from "react";
 import Link from "next/link";
-import BrandLogo from "@/components/BrandLogo";
 import { useRouter } from "next/navigation";
-import { Sparkles, Check } from "lucide-react";
-import { STRIPE_LOOKUP_KEYS, type StripeLookupKey } from "@/lib/stripe-config";
-import { useToast } from "@/components/ui/use-toast";
+import BrandLogo from "@/components/BrandLogo";
+import { Check, Sparkles, Zap, Crown } from "lucide-react";
+import { PLAN_CV_LIMITS, PLAN_PRICES, getPaddlePriceId } from "@/lib/user-plans";
+import PaddleCheckoutButton from "@/components/PaddleCheckoutButton";
 
-type BillingInterval = "monthly" | "yearly";
+type PlanKey = "free" | "basic" | "pro";
 
-type PriceCard = {
-  key: BillingInterval;
-  title: string;
-  priceText: string;
-  subtitle: string;
-  lookupKey: StripeLookupKey;
+type PricingPlan = {
+  key: PlanKey;
+  name: string;
+  price: string;
+  period: string;
+  description: string;
+  icon: ReactNode;
   features: string[];
-  popular?: boolean;
+  cta: string;
+  highlighted?: boolean;
+  paddlePlan?: "basic" | "pro";
 };
 
 export default function PricingPage() {
   const router = useRouter();
-  const { success, error: toastError } = useToast();
-  const [loading, setLoading] = useState<null | BillingInterval>(null);
 
-  const cards = useMemo<PriceCard[]>(
+  const basicPriceId = getPaddlePriceId("basic") ?? "";
+  const proPriceId = getPaddlePriceId("pro") ?? "";
+
+  const plans = useMemo<PricingPlan[]>(
     () => [
       {
-        key: "monthly",
-        title: "Pro Monthly",
-        priceText: "$5.99/month",
-        subtitle: "Best for job seekers",
-        lookupKey: STRIPE_LOOKUP_KEYS.PRO_MONTHLY,
-        popular: true,
+        key: "free",
+        name: "Free",
+        price: "$0",
+        period: "forever",
+        description: "Start building CVs instantly",
+        icon: <Sparkles className="h-5 w-5" />,
         features: [
-          "5 CV free limit",
-          "AI-powered CV optimization",
-          "Job match insights",
-          "Skill gap analysis",
-          "Interview trainer",
+          `${PLAN_CV_LIMITS.free} CV limit`,
+          "Basic templates",
+          "PDF export",
+          "Limited AI suggestions",
         ],
+        cta: "Get Started",
       },
       {
-        key: "yearly",
-        title: "Pro Yearly",
-        priceText: "$49.99/year",
-        subtitle: "Save vs monthly",
-        lookupKey: STRIPE_LOOKUP_KEYS.PRO_YEARLY,
+        key: "basic",
+        name: "Basic",
+        price: `$${PLAN_PRICES.basic.toFixed(2)}`,
+        period: "per month",
+        description: "More CVs and premium features",
+        icon: <Zap className="h-5 w-5" />,
         features: [
-          "5 CV free limit",
-          "AI-powered CV optimization",
+          `${PLAN_CV_LIMITS.basic} CV limit`,
+          "Premium templates",
           "Job match insights",
-          "Skill gap analysis",
-          "Interview trainer",
+          "No watermark",
         ],
+        cta: "Subscribe — Basic",
+        paddlePlan: "basic",
+      },
+      {
+        key: "pro",
+        name: "Pro",
+        price: `$${PLAN_PRICES.pro.toFixed(2)}`,
+        period: "per month",
+        description: "Unlimited CVs and all AI features",
+        icon: <Crown className="h-5 w-5" />,
+        features: [
+          "Unlimited CV generation",
+          "All AI features unlocked",
+          "Interview trainer",
+          "Priority support",
+        ],
+        cta: "Subscribe — Pro",
+        highlighted: true,
+        paddlePlan: "pro",
       },
     ],
     []
   );
 
-  const cancelAnytimeText = "Cancel anytime";
-  const aiText = "AI-powered CV optimization";
-
-  const cardLabelForFreeText = "5 CV free limit";
-
-
-  const startCheckout = async (lookupKey: StripeLookupKey, interval: BillingInterval) => {
-    setLoading(interval);
-    try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ lookup_key: lookupKey }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error || "Checkout failed");
-      }
-
-      if (!data?.url) {
-        throw new Error("No checkout URL returned");
-      }
-
-      window.location.href = data.url;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Checkout failed";
-      toastError("Subscription failed", message);
-    } finally {
-      setLoading(null);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-[#fafafa]">
-      <header className="border-b border-gray-200 bg-white">
+    <div className="min-h-screen bg-gradient-to-b from-[#fafafa] to-white">
+      <header className="border-b border-gray-200/80 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <BrandLogo href="/dashboard" showTagline size="md" />
-          <div className="flex items-center gap-3">
+          <BrandLogo href="/" showTagline size="md" />
+          <div className="flex items-center gap-4">
+            <Link href="/login" className="text-sm font-medium text-gray-600 hover:text-gray-900">
+              Sign in
+            </Link>
             <Link
               href="/dashboard"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900"
+              className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
             >
               Dashboard
             </Link>
@@ -112,103 +104,89 @@ export default function PricingPage() {
 
       <main className="mx-auto max-w-6xl px-6 py-16">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-gray-500">SmartCV Pro</p>
-          <h1 className="mt-2 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
-            Pricing that fits your job search
-          </h1>
-          <p className="mt-4 text-lg text-gray-500">
-            Start free with <span className="font-semibold text-gray-700">5 CVs</span>, then upgrade when
-            you’re ready.
+          <p className="text-sm font-semibold uppercase tracking-wider text-violet-600">
+            SmartCV Plans
           </p>
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3 text-sm text-gray-600">
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-flex h-2 w-2 rounded-full bg-gray-900" /> {cancelAnytimeText}
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-flex h-2 w-2 rounded-full bg-gray-900" /> Best for job seekers
-            </span>
-            <span className="inline-flex items-center gap-2">
-              <span className="inline-flex h-2 w-2 rounded-full bg-gray-900" /> {aiText}
-            </span>
-          </div>
+          <h1 className="mt-3 text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl">
+            Simple pricing that scales with you
+          </h1>
+          <p className="mt-4 text-lg text-gray-600">
+            Paddle-powered billing · Azerbaijan-friendly payments · Server-enforced limits
+          </p>
         </div>
 
-        <div className="mt-14 grid gap-8 lg:grid-cols-2 lg:items-stretch">
-          {cards.map((card) => (
+        <div className="mt-14 grid gap-6 md:grid-cols-3">
+          {plans.map((plan) => (
             <section
-              key={card.key}
+              key={plan.key}
               className={
-                card.popular
-                  ? "relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-7 shadow-sm ring-1 ring-gray-900/5"
-                  : "relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-7 shadow-sm"
+                plan.highlighted
+                  ? "relative flex flex-col rounded-2xl border-2 border-gray-900 bg-white p-6 shadow-xl"
+                  : "relative flex flex-col rounded-2xl border border-gray-200 bg-white p-6 shadow-sm"
               }
             >
-              {card.popular && (
-                <div className="absolute right-5 top-5 rounded-full bg-gray-900 px-3 py-1 text-xs font-semibold text-white">
-                  Most Popular
+              {plan.highlighted && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gray-900 px-4 py-1 text-xs font-bold uppercase text-white">
+                  Best Value
                 </div>
               )}
 
-              <div className="flex items-start justify-between gap-5">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900">{card.title}</h2>
-                  <p className="mt-1 text-sm text-gray-500">{card.subtitle}</p>
-                </div>
-                <div className="flex items-center gap-2 rounded-xl bg-gray-50 px-3 py-2">
-                  <Sparkles className="h-4 w-4 text-gray-900" />
-                  <span className="text-sm font-semibold text-gray-900">Pro</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <span
+                  className={
+                    plan.highlighted
+                      ? "rounded-lg bg-gray-900 p-2 text-white"
+                      : "rounded-lg bg-gray-100 p-2"
+                  }
+                >
+                  {plan.icon}
+                </span>
+                <h2 className="text-lg font-bold">{plan.name}</h2>
               </div>
 
-              <div className="mt-6 flex items-baseline gap-2">
-                <span className="text-4xl font-bold tracking-tight text-gray-900">{card.priceText}</span>
+              <p className="mt-3 text-sm text-gray-500">{plan.description}</p>
+
+              <div className="mt-5 flex items-baseline gap-1">
+                <span className="text-3xl font-bold">{plan.price}</span>
+                <span className="text-sm text-gray-500">/{plan.period}</span>
               </div>
 
-              <ul className="mt-6 space-y-3 text-sm text-gray-700">
-                {card.features.map((f) => (
-                  <li key={f} className="flex items-start gap-3">
-                    <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-900">
-                      <Check className="h-3.5 w-3.5 text-white" />
-                    </span>
-                    <span>{f}</span>
+              <ul className="mt-6 flex-1 space-y-3 text-sm text-gray-700">
+                {plan.features.map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+                    {f}
                   </li>
                 ))}
               </ul>
 
-              <div className="mt-7">
-                <button
-                  type="button"
-                  onClick={() => startCheckout(card.lookupKey, card.key)}
-                  disabled={loading === card.key}
-                  className={
-                    card.popular
-                      ? "w-full rounded-xl bg-gray-900 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
-                      : "w-full rounded-xl bg-gray-100 px-5 py-3 text-sm font-semibold text-gray-900 shadow-sm transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-60"
-                  }
-                >
-                  {loading === card.key ? "Redirecting…" : "Start trial & subscribe"}
-                </button>
+              <div className="mt-8">
+                {plan.key === "free" ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/register")}
+                    className="w-full rounded-xl border border-gray-200 py-3 text-sm font-semibold hover:bg-gray-50"
+                  >
+                    {plan.cta}
+                  </button>
+                ) : (
+                  <PaddleCheckoutButton
+                    plan={plan.paddlePlan!}
+                    priceId={plan.paddlePlan === "basic" ? basicPriceId : proPriceId}
+                    label={plan.cta}
+                    variant={plan.highlighted ? "default" : "outline"}
+                    className="w-full"
+                  />
+                )}
               </div>
-
-              <p className="mt-4 text-center text-xs text-gray-500">5 CV free limit included. Upgrade anytime.</p>
             </section>
           ))}
         </div>
 
-        <section className="mt-10 rounded-2xl border border-gray-200 bg-white p-7">
-          <h3 className="text-lg font-semibold text-gray-900">Start Free Trial</h3>
-          <p className="mt-2 text-sm text-gray-600">
-            You get <span className="font-semibold text-gray-900">5 CVs</span> with AI-powered optimization. When you subscribe,
-            your account unlocks Pro features. {cancelAnytimeText}.
-          </p>
-        </section>
-
-        <div className="mt-10 text-center text-xs text-gray-500">
-          Cancel anytime • Best for job seekers • AI-powered CV optimization
-        </div>
+        <p className="mt-12 text-center text-xs text-gray-500">
+          Subscription status is updated via Paddle webhook — never client-side.
+        </p>
       </main>
     </div>
   );
 }
-

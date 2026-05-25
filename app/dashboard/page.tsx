@@ -7,19 +7,19 @@ import {
   Sparkles,
   Plus,
   Loader2,
-  Crown,
-  AlertTriangle,
+  ArrowUpRight,
+  Wand2,
 } from "lucide-react";
 import QuickActions from "./overview/quick-actions";
 import RecentActivity from "./overview/recent-activity";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useCurrentUser, displayNameOf } from "@/hooks/useCurrentUser";
 import { useSession } from "next-auth/react";
-import {
-  shouldFetchAuthenticatedApis,
-} from "@/lib/auth-client";
+import { shouldFetchAuthenticatedApis } from "@/lib/auth-client";
 import UpgradeToProButton from "@/components/UpgradeToProButton";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
+import { PageShell, PageHeader, StatCard, Surface, ProgressBar } from "@/components/ui/page-shell";
+import { Button } from "@/components/ui/button";
 
 interface CvItem {
   id: string;
@@ -52,7 +52,6 @@ export default function DashboardPage() {
       setLoadingCvs(false);
       return;
     }
-
     let cancelled = false;
     const load = async () => {
       setLoadingCvs(true);
@@ -80,162 +79,129 @@ export default function DashboardPage() {
     };
   }, [reloadKey, status]);
 
-  const aiLeft = aiRemaining();
   const cvLeft = cvRemaining();
-
-  const aiLabel = useMemo(
-    () => (aiLeft === "unlimited" ? "Unlimited AI" : `${aiLeft} AI uses left`),
-    [aiLeft]
-  );
-  const cvLabel = useMemo(
-    () =>
-      cvLeft === "unlimited"
-        ? "Unlimited CVs"
-        : `${cvLeft} CV slot${cvLeft === 1 ? "" : "s"} left`,
-    [cvLeft]
-  );
+  const aiLeft = aiRemaining();
+  const cvMax = Number.isFinite(limits.maxCV) ? limits.maxCV : null;
 
   const limitReached =
-    !isPro &&
-    typeof cvLeft === "number" &&
-    cvLeft === 0 &&
-    !planLoading;
+    !isPro && typeof cvLeft === "number" && cvLeft === 0 && !planLoading;
 
-  const greeting = userLoading
-    ? "Welcome back"
-    : `Welcome back, ${displayNameOf(user)}`;
+  const greeting = userLoading ? "Welcome back" : displayNameOf(user);
+
+  const completedCount = useMemo(
+    () => cvs.filter((c) => c.status === "completed").length,
+    [cvs]
+  );
 
   return (
-    <div className="space-y-8">
-      <div className="rounded-2xl bg-gradient-to-r from-gray-900 to-gray-800 p-8 text-white shadow-lg">
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="truncate text-3xl font-bold">{greeting}</h1>
-            <p className="mt-2 text-gray-300">
-              {user?.email
-                ? `Signed in as ${user.email}`
-                : "Build, manage, and export your CVs with AI assistance."}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            {planLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
-            ) : (
-              <span
-                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold ${
-                  isPro
-                    ? "bg-white/15 text-white ring-1 ring-white/20"
-                    : "bg-amber-500/20 text-amber-100 ring-1 ring-amber-400/30"
-                }`}
-              >
-                {isPro && <Crown size={16} />}
-                {isPro ? "Pro Plan" : "Free Plan"}
-              </span>
-            )}
-            {!isPro && !planLoading && (
-              <UpgradeToProButton label="Upgrade to Pro" />
-            )}
-          </div>
-        </div>
-        {!isPro && !planLoading && (
-          <div className="mt-6 flex flex-wrap gap-4 text-sm text-gray-300">
-            <span className="inline-flex items-center gap-1.5">
-              <Sparkles size={14} /> {aiLabel}
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <FileText size={14} />
-              {Number.isFinite(limits.maxCV)
-                ? `${usage.cvCount}/${limits.maxCV} CVs used`
-                : cvLabel}
-            </span>
-          </div>
-        )}
-        {limitReached && (
-          <div className="mt-4 flex items-start gap-2 rounded-xl bg-amber-500/10 px-4 py-3 text-sm text-amber-100 ring-1 ring-amber-400/30">
-            <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
-            <span>
-              You&apos;ve used your free CV slot. Upgrade to Pro to create
-              unlimited CVs.
-            </span>
-          </div>
-        )}
+    <PageShell>
+      <PageHeader
+        eyebrow="Overview"
+        title={`Good to see you, ${greeting.split(" ")[0]}`}
+        description={
+          user?.email
+            ? `Manage your CVs and track usage from your workspace.`
+            : "Build, refine, and export professional CVs with AI."
+        }
+        action={
+          !isPro && !planLoading ? (
+            <UpgradeToProButton label="Upgrade" size="sm" />
+          ) : undefined
+        }
+      />
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="Total CVs" value={loadingCvs ? "—" : cvs.length} icon={FileText} />
+        <StatCard label="Completed" value={loadingCvs ? "—" : completedCount} hint="Ready to export" />
+        <StatCard
+          label="AI remaining"
+          value={aiLeft === "unlimited" ? "∞" : String(aiLeft)}
+          icon={Sparkles}
+        />
+        <StatCard
+          label="Plan"
+          value={planLoading ? "—" : plan}
+          hint={isPro ? "All features" : "Upgrade for more"}
+          icon={Wand2}
+        />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Your CVs</h2>
-            <Link
-              href="/dashboard/builder"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-800"
-              aria-disabled={limitReached}
-              onClick={(e) => {
-                if (limitReached) e.preventDefault();
-              }}
-            >
-              <Plus size={14} /> New CV
-            </Link>
+      <div className="grid gap-6 lg:grid-cols-5">
+        {/* CV list — wider column */}
+        <Surface className="lg:col-span-3" padding>
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-zinc-900">Your CVs</h2>
+              <p className="mt-0.5 text-xs text-zinc-500">Recent documents</p>
+            </div>
+            <Button size="sm" asChild disabled={limitReached}>
+              <Link href="/dashboard/builder">
+                <Plus className="h-3.5 w-3.5" />
+                New CV
+              </Link>
+            </Button>
           </div>
 
+          {!isPro && cvMax !== null && (
+            <div className="mb-5">
+              <ProgressBar label="CV usage" value={usage.cvCount} max={cvMax} />
+            </div>
+          )}
+
           {loadingCvs ? (
-            <LoadingState label="Loading your CVs…" />
+            <LoadingState label="Loading CVs…" />
           ) : error ? (
-            <ErrorState
-              title="Couldn't load your CVs"
-              description={error}
-              onRetry={() => setReloadKey((k) => k + 1)}
-            />
+            <ErrorState description={error} onRetry={() => setReloadKey((k) => k + 1)} />
           ) : cvs.length === 0 ? (
             <EmptyState
               icon={FileText}
               title="No CVs yet"
-              description="Create your first CV with the builder or AI generator."
+              description="Start with the builder or AI generator."
               action={
-                <Link
-                  href="/dashboard/builder"
-                  className="inline-block rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
-                >
-                  Start building
-                </Link>
+                <Button asChild size="sm">
+                  <Link href="/dashboard/builder">Create your first CV</Link>
+                </Button>
               }
             />
           ) : (
-            <ul className="divide-y divide-gray-100">
-              {cvs.slice(0, 5).map((cv) => (
+            <ul className="divide-y divide-black/[0.06]">
+              {cvs.slice(0, 6).map((cv) => (
                 <li
                   key={cv.id}
-                  className="flex items-center justify-between py-3 first:pt-0"
+                  className="group flex items-center justify-between py-3.5 first:pt-0 last:pb-0"
                 >
-                  <div className="min-w-0 pr-3">
-                    <p className="truncate font-medium text-gray-900">
-                      {cv.title}
-                    </p>
-                    <p className="text-xs text-gray-500 capitalize">
+                  <div className="min-w-0 pr-4">
+                    <p className="truncate text-sm font-medium text-zinc-900">{cv.title}</p>
+                    <p className="mt-0.5 text-xs capitalize text-zinc-400">
                       {cv.status} ·{" "}
                       {(() => {
                         const d = new Date(cv.updatedAt);
                         return Number.isFinite(d.getTime())
-                          ? d.toLocaleDateString()
+                          ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
                           : "—";
                       })()}
                     </p>
                   </div>
                   <Link
                     href="/dashboard/builder"
-                    className="flex-shrink-0 text-sm font-medium text-gray-600 hover:text-gray-900"
+                    className="flex items-center gap-1 text-xs font-medium text-zinc-500 opacity-0 transition-all group-hover:opacity-100 hover:text-zinc-900"
                   >
                     Edit
+                    <ArrowUpRight className="h-3 w-3" />
                   </Link>
                 </li>
               ))}
             </ul>
           )}
-        </div>
+        </Surface>
 
-        <QuickActions />
+        <div className="space-y-6 lg:col-span-2">
+          <QuickActions />
+        </div>
       </div>
 
       <RecentActivity cvs={cvs} loading={loadingCvs} />
-    </div>
+    </PageShell>
   );
 }

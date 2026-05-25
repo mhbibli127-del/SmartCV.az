@@ -1,26 +1,140 @@
-'use client';
-import React, { useState } from 'react';
-import { User, Briefcase, Sparkles, ArrowLeft, Loader2, Mail, Phone, GraduationCap, MapPin, Globe } from 'lucide-react';
+"use client";
+
+import React, { useState } from "react";
+import {
+  User,
+  Briefcase,
+  Sparkles,
+  ArrowLeft,
+  Loader2,
+  Mail,
+  Phone,
+  MapPin,
+  Globe,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Surface } from "@/components/ui/page-shell";
+import { cn } from "@/lib/utils";
 
 interface FormProps {
   onBack: () => void;
-  onSubmit: (formData: any) => void;
+  onSubmit: (formData: Record<string, string>) => void;
   isLoading: boolean;
-  preFilledData?: any;
+  preFilledData?: Record<string, string>;
+  accentColor?: string;
 }
 
-export default function CVFormSection({ onBack, onSubmit, isLoading, preFilledData }: FormProps) {
+function LivePreview({
+  data,
+  accentColor = "#18181b",
+  isGenerating,
+}: {
+  data: Record<string, string>;
+  accentColor?: string;
+  isGenerating?: boolean;
+}) {
+  const skills = data.rawSkills
+    ? data.rawSkills.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 8)
+    : [];
+
+  return (
+    <Surface className="sticky top-24 h-fit" padding>
+      <div className="mb-4 flex items-center justify-between">
+        <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">Live preview</p>
+        {isGenerating && (
+          <span className="flex items-center gap-1.5 text-xs text-zinc-500">
+            <span className="flex gap-0.5">
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className="h-1 w-1 rounded-full bg-zinc-400 animate-thinking"
+                  style={{ animationDelay: `${i * 0.2}s` }}
+                />
+              ))}
+            </span>
+            AI thinking
+          </span>
+        )}
+      </div>
+
+      <div className="overflow-hidden rounded-[12px] border border-black/[0.06] bg-zinc-50/80">
+        <div className="h-1" style={{ backgroundColor: accentColor }} />
+        <div className="space-y-5 p-6">
+          <div>
+            <h3 className="text-xl font-semibold tracking-tight text-zinc-900">
+              {data.fullName || "Your name"}
+            </h3>
+            <p className="mt-1 text-sm font-medium" style={{ color: accentColor }}>
+              {data.title || "Professional title"}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-500">
+              {data.email && <span>{data.email}</span>}
+              {data.phone && <span>{data.phone}</span>}
+              {data.location && <span>{data.location}</span>}
+            </div>
+          </div>
+
+          {(data.rawExperience || isGenerating) && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                Experience
+              </p>
+              {isGenerating ? (
+                <div className="space-y-2">
+                  <div className="skeleton h-2 w-full rounded" />
+                  <div className="skeleton h-2 w-5/6 rounded" />
+                  <div className="skeleton h-2 w-4/6 rounded" />
+                </div>
+              ) : (
+                <p className="line-clamp-4 text-xs leading-relaxed text-zinc-600">
+                  {data.rawExperience}
+                </p>
+              )}
+            </div>
+          )}
+
+          {skills.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {skills.map((skill) => (
+                <span
+                  key={skill}
+                  className="rounded-md bg-white px-2 py-0.5 text-[10px] text-zinc-600 ring-1 ring-black/[0.06]"
+                >
+                  {skill}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {!data.fullName && !data.title && !data.rawExperience && !isGenerating && (
+            <p className="py-8 text-center text-xs text-zinc-400">
+              Start typing — your CV preview updates in real time.
+            </p>
+          )}
+        </div>
+      </div>
+    </Surface>
+  );
+}
+
+export default function CVFormSection({
+  onBack,
+  onSubmit,
+  isLoading,
+  preFilledData,
+  accentColor,
+}: FormProps) {
   const [formData, setData] = useState({
-    fullName: preFilledData?.fullName || '',
-    email: preFilledData?.email || '',
-    phone: preFilledData?.phone || '',
-    location: preFilledData?.location || '',
-    website: preFilledData?.website || '',
-    title: preFilledData?.title || '',
-    rawExperience: preFilledData?.rawExperience || '',
-    rawEducation: preFilledData?.rawEducation || '',
-    rawSkills: preFilledData?.rawSkills || '',
-    targetIndustry: preFilledData?.targetIndustry || ''
+    fullName: preFilledData?.fullName || "",
+    email: preFilledData?.email || "",
+    phone: preFilledData?.phone || "",
+    location: preFilledData?.location || "",
+    website: preFilledData?.website || "",
+    title: preFilledData?.title || "",
+    rawExperience: preFilledData?.rawExperience || "",
+    rawEducation: preFilledData?.rawEducation || "",
+    rawSkills: preFilledData?.rawSkills || "",
+    targetIndustry: preFilledData?.targetIndustry || "",
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -29,190 +143,177 @@ export default function CVFormSection({ onBack, onSubmit, isLoading, preFilledDa
     onSubmit(formData);
   };
 
+  const fieldClass =
+    "w-full pl-10 pr-3.5 py-2.5 rounded-[12px] border border-black/[0.08] bg-white text-sm transition-all focus:border-black/[0.12] focus:outline-none focus:ring-2 focus:ring-zinc-900/10";
+
   return (
-    <div className="space-y-8 max-w-2xl mx-auto">
-      <button onClick={onBack} className="inline-flex items-center space-x-2 text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
-        <ArrowLeft size={16} />
-        <span>Back to template selection</span>
+    <div className="space-y-6">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-900"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to templates
       </button>
 
-      <div className="space-y-2">
-        <div className="inline-flex items-center space-x-2 bg-black text-white px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider">
-          <Sparkles size={12} className="text-white" />
-          <span>Step 2: AI-Powered Data Entry</span>
+      <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
+        {/* Left — input panel */}
+        <div className="space-y-6">
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium uppercase tracking-widest text-zinc-400">Step 2</p>
+            <h2 className="text-xl font-semibold tracking-tight text-zinc-900">
+              Tell us about yourself
+            </h2>
+            <p className="text-sm text-zinc-500">
+              AI will transform your details into a polished, ATS-friendly CV.
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <Surface padding className="space-y-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Personal
+              </h3>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-medium text-zinc-600">Full name</label>
+                  <div className="relative">
+                    <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                    <input
+                      type="text"
+                      placeholder="John Doe"
+                      required
+                      className={fieldClass}
+                      value={formData.fullName}
+                      onChange={(e) => setData({ ...formData, fullName: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-600">Email</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                    <input
+                      type="email"
+                      placeholder="john@example.com"
+                      className={fieldClass}
+                      value={formData.email}
+                      onChange={(e) => setData({ ...formData, email: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-600">Phone</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                    <input
+                      type="tel"
+                      placeholder="+994 50 000 00 00"
+                      className={fieldClass}
+                      value={formData.phone}
+                      onChange={(e) => setData({ ...formData, phone: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-600">Location</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                    <input
+                      type="text"
+                      placeholder="Baku, Azerbaijan"
+                      className={fieldClass}
+                      value={formData.location}
+                      onChange={(e) => setData({ ...formData, location: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-zinc-600">Website</label>
+                  <div className="relative">
+                    <Globe className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                    <input
+                      type="url"
+                      placeholder="https://yoursite.com"
+                      className={fieldClass}
+                      value={formData.website}
+                      onChange={(e) => setData({ ...formData, website: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </Surface>
+
+            <Surface padding className="space-y-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                Professional
+              </h3>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600">Current title</label>
+                <div className="relative">
+                  <Briefcase className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="text"
+                    placeholder="Senior Software Engineer"
+                    required
+                    className={fieldClass}
+                    value={formData.title}
+                    onChange={(e) => setData({ ...formData, title: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600">Work experience</label>
+                <textarea
+                  rows={4}
+                  placeholder="Brief work history — AI will format this professionally."
+                  className={cn(fieldClass, "resize-none pl-3.5 leading-relaxed")}
+                  value={formData.rawExperience}
+                  onChange={(e) => setData({ ...formData, rawExperience: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600">Education</label>
+                <textarea
+                  rows={3}
+                  placeholder="Degrees, institutions, graduation years…"
+                  className={cn(fieldClass, "resize-none pl-3.5 leading-relaxed")}
+                  value={formData.rawEducation}
+                  onChange={(e) => setData({ ...formData, rawEducation: e.target.value })}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-zinc-600">Skills</label>
+                <textarea
+                  rows={3}
+                  placeholder="JavaScript, React, Node.js, AWS…"
+                  className={cn(fieldClass, "resize-none pl-3.5 leading-relaxed")}
+                  value={formData.rawSkills}
+                  onChange={(e) => setData({ ...formData, rawSkills: e.target.value })}
+                />
+              </div>
+            </Surface>
+
+            <Button type="submit" disabled={isLoading} className="w-full" size="lg">
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating your CV…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Generate with AI
+                </>
+              )}
+            </Button>
+          </form>
         </div>
-        <h2 className="text-3xl font-bold tracking-tight text-gray-900">Enter Your Information</h2>
-        <p className="text-gray-500 text-sm">
-          Simply provide your details. AI will transform them into a professional, beautiful CV.
-        </p>
+
+        {/* Right — live preview */}
+        <LivePreview data={formData} accentColor={accentColor} isGenerating={isLoading} />
       </div>
-
-      <form onSubmit={handleSubmit} className="bg-white border border-gray-200 p-8 rounded-xl shadow-sm space-y-6">
-        {/* Personal Information */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-2">Personal Information</h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">Full Name</label>
-              <div className="relative">
-                <User className="absolute left-4 top-3.5 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="John Doe"
-                  required
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white transition-all"
-                  value={formData.fullName}
-                  onChange={e => setData({...formData, fullName: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-3.5 text-gray-400" size={18} />
-                <input
-                  type="email"
-                  placeholder="john@example.com"
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white transition-all"
-                  value={formData.email}
-                  onChange={e => setData({...formData, email: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">Phone</label>
-              <div className="relative">
-                <Phone className="absolute left-4 top-3.5 text-gray-400" size={18} />
-                <input
-                  type="tel"
-                  placeholder="+1 234 567 890"
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white transition-all"
-                  value={formData.phone}
-                  onChange={e => setData({...formData, phone: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">Location</label>
-              <div className="relative">
-                <MapPin className="absolute left-4 top-3.5 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="New York, NY"
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white transition-all"
-                  value={formData.location}
-                  onChange={e => setData({...formData, location: e.target.value})}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">Website/Portfolio</label>
-              <div className="relative">
-                <Globe className="absolute left-4 top-3.5 text-gray-400" size={18} />
-                <input
-                  type="url"
-                  placeholder="https://yourportfolio.com"
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white transition-all"
-                  value={formData.website}
-                  onChange={e => setData({...formData, website: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">Target Industry</label>
-              <div className="relative">
-                <Briefcase className="absolute left-4 top-3.5 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  placeholder="Technology, Finance, Healthcare..."
-                  className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white transition-all"
-                  value={formData.targetIndustry}
-                  onChange={e => setData({...formData, targetIndustry: e.target.value})}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Professional Information */}
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200 pb-2">Professional Information</h3>
-          
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">Current Title / Position</label>
-            <div className="relative">
-              <Briefcase className="absolute left-4 top-3.5 text-gray-400" size={18} />
-              <input
-                type="text"
-                placeholder="Senior Software Engineer"
-                required
-                className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white transition-all"
-                value={formData.title}
-                onChange={e => setData({...formData, title: e.target.value})}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">Work Experience (AI will format this)</label>
-            <textarea
-              rows={4}
-              placeholder="Describe your work history briefly. AI will extract and format it professionally. Example: Worked at Google as Senior Developer for 3 years, led a team of 5 engineers, built scalable systems..."
-              className="w-full p-4 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white transition-all resize-none leading-relaxed"
-              value={formData.rawExperience}
-              onChange={e => setData({...formData, rawExperience: e.target.value})}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">Education (AI will format this)</label>
-            <textarea
-              rows={3}
-              placeholder="Your educational background. Example: BS in Computer Science from MIT, graduated 2020, GPA 3.8..."
-              className="w-full p-4 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white transition-all resize-none leading-relaxed"
-              value={formData.rawEducation}
-              onChange={e => setData({...formData, rawEducation: e.target.value})}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block">Skills (AI will categorize and highlight)</label>
-            <textarea
-              rows={3}
-              placeholder="List your skills separated by commas. Example: JavaScript, React, Node.js, Python, Machine Learning, AWS, Docker..."
-              className="w-full p-4 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 focus:bg-white transition-all resize-none leading-relaxed"
-              value={formData.rawSkills}
-              onChange={e => setData({...formData, rawSkills: e.target.value})}
-            />
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={isLoading}
-          className="w-full inline-flex items-center justify-center space-x-2 bg-black text-white font-medium py-4 rounded-xl hover:bg-gray-900 transition-all text-sm disabled:opacity-50"
-        >
-          {isLoading ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              <span>AI is creating your beautiful CV...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles size={16} className="text-white" />
-              <span>Generate Professional CV with AI</span>
-            </>
-          )}
-        </button>
-      </form>
     </div>
   );
 }

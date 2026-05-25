@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
     return NextResponse.json({
-      sessionId: result.sessionId,
       url: result.url,
+      transactionId: result.transactionId,
     });
   } catch (err) {
     console.error("[checkout]", err);

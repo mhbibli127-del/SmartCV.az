@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Clock, FileText, Loader2 } from "lucide-react";
+import { Surface } from "@/components/ui/page-shell";
 
 interface CvItem {
   id: string;
@@ -24,10 +25,10 @@ function formatRelative(dateStr: string): string {
   const hour = 60 * minute;
   const day = 24 * hour;
   if (diff < minute) return "just now";
-  if (diff < hour) return `${Math.floor(diff / minute)} min ago`;
-  if (diff < day) return `${Math.floor(diff / hour)} hours ago`;
-  if (diff < 7 * day) return `${Math.floor(diff / day)} days ago`;
-  return d.toLocaleDateString();
+  if (diff < hour) return `${Math.floor(diff / minute)}m ago`;
+  if (diff < day) return `${Math.floor(diff / hour)}h ago`;
+  if (diff < 7 * day) return `${Math.floor(diff / day)}d ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 export default function RecentActivity({ cvs, loading }: RecentActivityProps) {
@@ -37,76 +38,65 @@ export default function RecentActivity({ cvs, loading }: RecentActivityProps) {
     if (!Array.isArray(cvs)) return [];
     return cvs
       .slice()
-      .sort(
-        (a, b) =>
-          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      )
-      .slice(0, 5)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 6)
       .map((cv) => ({
         id: cv.id,
-        title:
-          cv.status === "completed"
-            ? `Completed ${cv.title}`
-            : `Saved ${cv.title}`,
-        description:
-          cv.status === "completed" ? "Marked as completed" : "Saved as draft",
+        title: cv.title,
+        description: cv.status === "completed" ? "Marked complete" : "Saved as draft",
         time: formatRelative(cv.updatedAt),
       }));
   }, [cvs]);
 
   return (
-    <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold text-gray-900">Recent Activity</h3>
+    <Surface padding>
+      <div className="mb-5 flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-zinc-900">Recent activity</h3>
+          <p className="mt-0.5 text-xs text-zinc-500">Latest changes to your CVs</p>
+        </div>
         <button
           type="button"
           onClick={() => router.push("/dashboard/analytics")}
-          className="text-sm text-black font-semibold hover:text-gray-700 transition-colors"
+          className="text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-900"
         >
-          View All
+          View all
         </button>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-10 text-gray-400">
+        <div className="flex justify-center py-10 text-zinc-300">
           <Loader2 className="h-5 w-5 animate-spin" />
         </div>
       ) : activities.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-gray-200 py-10 text-center">
-          <Clock className="mx-auto h-8 w-8 text-gray-300" />
-          <p className="mt-3 text-sm font-medium text-gray-900">
-            No activity yet
-          </p>
-          <p className="mt-1 text-sm text-gray-500">
-            Save or complete a CV to see it appear here.
-          </p>
+        <div className="rounded-[12px] border border-dashed border-black/[0.08] py-12 text-center">
+          <Clock className="mx-auto h-7 w-7 text-zinc-300" />
+          <p className="mt-3 text-sm font-medium text-zinc-700">No activity yet</p>
+          <p className="mt-1 text-xs text-zinc-400">Your edits will appear here.</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-1">
           {activities.map((activity) => (
             <div
               key={activity.id}
-              className="flex items-start gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-3 rounded-[10px] px-2 py-2.5 transition-colors hover:bg-zinc-50"
             >
-              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                <FileText size={18} className="text-gray-600" />
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-zinc-100">
+                <FileText className="h-3.5 w-3.5 text-zinc-500" />
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-gray-900 text-sm truncate">
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-medium text-zinc-900">
                   {activity.title}
                 </p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {activity.description}
-                </p>
+                <p className="text-xs text-zinc-400">{activity.description}</p>
               </div>
-              <div className="flex items-center gap-1 text-xs text-gray-400 flex-shrink-0">
-                <Clock size={12} />
-                <span>{activity.time}</span>
-              </div>
+              <span className="shrink-0 text-xs tabular-nums text-zinc-400">
+                {activity.time}
+              </span>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </Surface>
   );
 }

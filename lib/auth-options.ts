@@ -18,7 +18,7 @@ function buildProviders() {
   ];
 }
 
-/** Lazy Prisma import — never loaded during Next.js static build. */
+/** Lazy Prisma + MongoDB SaaS user upsert on Google login. */
 async function upsertGoogleUser(params: {
   email: string;
   name?: string | null;
@@ -27,6 +27,7 @@ async function upsertGoogleUser(params: {
   if (isBuildPhase()) return;
 
   const { default: prisma } = await import("@/lib/prisma");
+  const { upsertSaasUserOnAuth } = await import("@/lib/saas-user");
   const email = params.email.toLowerCase().trim();
 
   await prisma.user.upsert({
@@ -37,6 +38,9 @@ async function upsertGoogleUser(params: {
       image: params.image ?? null,
       emailVerified: new Date(),
       provider: "google",
+      plan: "free",
+      cvLimit: 3,
+      cvUsed: 0,
     },
     update: {
       name: params.name ?? undefined,
@@ -45,6 +49,8 @@ async function upsertGoogleUser(params: {
       provider: "google",
     },
   });
+
+  await upsertSaasUserOnAuth({ email, name: params.name });
 }
 
 async function notifyGoogleLogin(email: string) {

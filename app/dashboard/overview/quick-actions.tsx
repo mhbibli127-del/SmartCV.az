@@ -1,56 +1,33 @@
 "use client";
 
-import React from "react";
 import { useRouter } from "next/navigation";
-import { FileEdit, Wand2, Library, TrendingUp } from "lucide-react";
+import { FileEdit, Wand2, Library, TrendingUp, ArrowUpRight } from "lucide-react";
+import { Surface } from "@/components/ui/page-shell";
 
-type ActionColor = "blue" | "purple" | "green" | "orange";
-
-// Tailwind purges classes it can't see literally in the source — never
-// interpolate class names like `bg-${color}-100`. Pre-resolve them here.
-const COLOR_CLASSES: Record<ActionColor, { bg: string; text: string }> = {
-  blue: { bg: "bg-blue-100", text: "text-blue-600" },
-  purple: { bg: "bg-purple-100", text: "text-purple-600" },
-  green: { bg: "bg-green-100", text: "text-green-600" },
-  orange: { bg: "bg-orange-100", text: "text-orange-600" },
-};
-
-interface ActionItem {
-  icon: typeof FileEdit;
-  label: string;
-  description: string;
-  href: string;
-  color: ActionColor;
-}
-
-const ACTIONS: ActionItem[] = [
+const ACTIONS = [
   {
     icon: FileEdit,
-    label: "Create New CV",
+    label: "Create CV",
     description: "Start from scratch",
     href: "/dashboard/builder",
-    color: "blue",
   },
   {
     icon: Wand2,
     label: "AI Generator",
     description: "Generate with AI",
     href: "/dashboard/generator",
-    color: "purple",
   },
   {
     icon: Library,
-    label: "Browse Templates",
-    description: "50+ templates",
+    label: "Examples",
+    description: "Browse profiles",
     href: "/dashboard/examples",
-    color: "green",
   },
   {
     icon: TrendingUp,
-    label: "View Analytics",
-    description: "Track performance",
+    label: "Analytics",
+    description: "Track progress",
     href: "/dashboard/analytics",
-    color: "orange",
   },
 ];
 
@@ -58,41 +35,31 @@ export default function QuickActions() {
   const router = useRouter();
 
   return (
-    <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold text-gray-900">Quick Actions</h3>
-        <button
-          type="button"
-          onClick={() => router.push("/dashboard/builder")}
-          className="text-sm text-black font-semibold hover:text-gray-700 transition-colors"
-        >
-          View All
-        </button>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+    <Surface padding>
+      <h3 className="text-sm font-semibold text-zinc-900">Quick actions</h3>
+      <p className="mt-0.5 text-xs text-zinc-500">Jump to a workflow</p>
+      <div className="mt-4 grid grid-cols-2 gap-2">
         {ACTIONS.map((action) => {
           const Icon = action.icon;
-          const colors = COLOR_CLASSES[action.color];
           return (
             <button
               key={action.label}
               type="button"
               onClick={() => router.push(action.href)}
-              className="group p-4 rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all text-left"
+              className="group flex flex-col items-start rounded-[12px] border border-black/[0.06] bg-zinc-50/50 p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-black/[0.1] hover:bg-white hover:shadow-sm"
             >
-              <div
-                className={`w-10 h-10 rounded-lg ${colors.bg} flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}
-              >
-                <Icon size={20} className={colors.text} />
+              <div className="flex w-full items-center justify-between">
+                <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-white shadow-sm ring-1 ring-black/[0.06]">
+                  <Icon className="h-4 w-4 text-zinc-600" />
+                </div>
+                <ArrowUpRight className="h-3.5 w-3.5 text-zinc-300 transition-all group-hover:text-zinc-500" />
               </div>
-              <p className="font-semibold text-gray-900 text-sm">
-                {action.label}
-              </p>
-              <p className="text-xs text-gray-500 mt-1">{action.description}</p>
+              <p className="mt-3 text-[13px] font-medium text-zinc-900">{action.label}</p>
+              <p className="mt-0.5 text-xs text-zinc-400">{action.description}</p>
             </button>
           );
         })}
       </div>
-    </div>
+    </Surface>
   );
 }

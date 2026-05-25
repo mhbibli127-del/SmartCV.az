@@ -9,6 +9,7 @@ const authRoutes = [
 
 const protectedRoutes = [
   "/dashboard",
+  "/admin",
 ];
 
 export default function middleware(request: NextRequest) {
@@ -65,5 +66,6 @@ export const config = {
     "/register",
     "/verify-otp",
     "/dashboard/:path*",
+    "/admin/:path*",
   ],
 };

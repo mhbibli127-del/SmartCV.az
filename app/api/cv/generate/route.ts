@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/session';
 import { getOpenAI } from '@/lib/openai';
+import { assertCanUseAI, incrementAiUsed } from '@/lib/ai-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +23,14 @@ export async function POST(req: NextRequest) {
   
   if (!user?.email) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const aiCheck = await assertCanUseAI(user.email);
+  if (!aiCheck.allowed) {
+    return NextResponse.json(
+      { error: aiCheck.error, code: aiCheck.code },
+      { status: 403 }
+    );
   }
 
   try {
@@ -131,6 +140,8 @@ Make the CV content impressive, ATS-optimized, and tailored to the ${targetIndus
         title
       }
     };
+
+    await incrementAiUsed(user.email).catch(() => {});
 
     return NextResponse.json(completeCV);
   } catch (error) {

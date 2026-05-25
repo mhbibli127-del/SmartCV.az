@@ -1,6 +1,7 @@
 import type Stripe from "stripe";
 import prisma from "@/lib/prisma";
-import { type SubscriptionPlanTier } from "@/lib/stripe-config";
+import { lookupKeyToPlanTier, type SubscriptionPlanTier } from "@/lib/stripe-config";
+import { stripeTierToPlan } from "@/lib/plan-service";
 
 const ACTIVE_STATUSES = new Set(["active", "trialing"]);
 
@@ -34,6 +35,7 @@ export async function updateUserSubscription(params: {
       subscriptionStatus: params.subscriptionStatus,
       subscriptionPlan: params.subscriptionPlan,
       subscriptionCurrentPeriodEnd: params.subscriptionCurrentPeriodEnd ?? null,
+      plan: stripeTierToPlan(params.subscriptionPlan),
     },
   });
 }
@@ -43,12 +45,8 @@ export async function syncUserFromStripeSubscription(
   fallbackUserId?: number
 ) {
   const lookupKey = resolveLookupKeyFromSubscription(subscription);
-  // Any active/trialing subscription unlocks "pro". We do NOT require the
-  // price to have one of our known lookup keys — otherwise a real paid
-  // subscription with a misconfigured price would leave the user on "free".
-  // The lookup key is still stored separately for billing UI / analytics.
   const planTier: SubscriptionPlanTier = ACTIVE_STATUSES.has(subscription.status)
-    ? "pro"
+    ? lookupKeyToPlanTier(lookupKey)
     : "free";
 
   const userIdFromMeta = subscription.metadata?.userId;
@@ -140,12 +138,10 @@ export async function findUserIdFromCheckoutSession(
   return null;
 }
 
-/** Map DB subscriptionPlan → frontend plan for limits/UI */
+/** Map DB subscriptionPlan → legacy frontend plan (free | pro) */
 export function dbPlanToAppPlan(
   dbPlan: string | null | undefined
 ): "free" | "pro" {
-  if (dbPlan === "pro" || dbPlan === "starter" || dbPlan === "premium") {
-    return "pro";
-  }
-  return "free";
+  const mapped = stripeTierToPlan(dbPlan);
+  return mapped === "pro" ? "pro" : "free";
 }

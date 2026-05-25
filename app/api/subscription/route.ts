@@ -1,29 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/session";
-import { findUserByEmail } from "@/lib/users";
-import { dbPlanToAppPlan } from "@/lib/subscription-service";
-import { countUserCVs } from "@/lib/plan-limits";
-import { PLAN_LIMITS } from "@/lib/plans";
-
-function subscriptionFields(user: NonNullable<Awaited<ReturnType<typeof findUserByEmail>>>) {
-  if ("subscriptionPlan" in user) {
-    return {
-      subscriptionPlan: user.subscriptionPlan,
-      subscriptionStatus: user.subscriptionStatus,
-      stripePriceLookupKey: user.stripePriceLookupKey,
-      subscriptionCurrentPeriodEnd: user.subscriptionCurrentPeriodEnd,
-    };
-  }
-  return {
-    subscriptionPlan: "free" as string | null,
-    subscriptionStatus: "inactive" as string | null,
-    stripePriceLookupKey: null as string | null,
-    subscriptionCurrentPeriodEnd: null as Date | null,
-  };
-}
+import { findSaasUserByEmail } from "@/lib/saas-user";
+import { isUnlimitedCvLimit } from "@/lib/user-plans";
 
 export const dynamic = "force-dynamic";
 
+/** GET — current user's subscription state from MongoDB (server-side truth). */
 export async function GET(req: NextRequest) {
   try {
     const auth = await getAuthenticatedUser(req);
@@ -31,46 +13,35 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const email = auth.email.toLowerCase().trim();
-    const user = await findUserByEmail(email);
-
+    const user = await findSaasUserByEmail(auth.email);
     if (!user) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return NextResponse.json({
+        plan: "free",
+        cvUsed: 0,
+        cvLimit: 3,
+        status: "active",
+        usage: { cvCount: 0, aiCount: 0 },
+        limits: { maxCV: 3, cvLimit: 3 },
+      });
     }
 
-    const sub = subscriptionFields(user);
-
-    const storedPlan = dbPlanToAppPlan(sub.subscriptionPlan);
-    const isActive =
-      sub.subscriptionStatus === "active" ||
-      sub.subscriptionStatus === "trialing";
-
-    const effectivePlan: "free" | "pro" = isActive ? storedPlan : "free";
-    const limits = PLAN_LIMITS[effectivePlan] ?? PLAN_LIMITS.free;
-
-    let cvCount = 0;
-    try {
-      cvCount = await countUserCVs(email);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.warn("[subscription GET] failed to count CVs", err);
-    }
-
-    const cvLimit = Number.isFinite(limits.maxCV) ? limits.maxCV : null;
+    const unlimited = user.plan === "pro" || isUnlimitedCvLimit(user.cvLimit);
 
     return NextResponse.json({
-      plan: effectivePlan,
-      subscriptionPlan: isActive ? sub.subscriptionPlan : "free",
-      subscriptionStatus: sub.subscriptionStatus ?? "inactive",
-      lookupKey: sub.stripePriceLookupKey,
-      currentPeriodEnd: sub.subscriptionCurrentPeriodEnd,
-      hasActiveSubscription: isActive && effectivePlan !== "free",
+      plan: user.plan,
+      storedPlan: user.plan,
+      subscriptionPlan: user.plan,
+      subscriptionStatus: user.status,
+      hasActiveSubscription: user.plan === "basic" || user.plan === "pro",
       usage: {
-        cvCount,
+        cvCount: user.cvUsed,
+        cvUsed: user.cvUsed,
       },
       limits: {
-        maxCV: cvLimit,
+        maxCV: unlimited ? null : user.cvLimit,
+        cvLimit: unlimited ? null : user.cvLimit,
       },
+      status: user.status,
     });
   } catch (err) {
     console.error("[subscription GET]", err);

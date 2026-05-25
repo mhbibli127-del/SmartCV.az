@@ -2,75 +2,59 @@
 
 import { useState } from "react";
 import { Sparkles, Loader2 } from "lucide-react";
-import { STRIPE_LOOKUP_KEYS, type StripeLookupKey } from "@/lib/stripe-config";
 import { useToast } from "@/components/ui/use-toast";
+import { Button } from "@/components/ui/button";
 
-interface UpgradeToProButtonProps {
-  lookupKey?: StripeLookupKey;
+interface UpgradeButtonProps {
+  plan?: "basic" | "pro";
   label?: string;
   className?: string;
-  variant?: "primary" | "gradient";
+  variant?: "default" | "outline";
+  size?: "default" | "sm" | "lg" | "icon";
 }
 
 export default function UpgradeToProButton({
-  lookupKey = STRIPE_LOOKUP_KEYS.PRO_MONTHLY,
-  label = "Upgrade to Pro",
+  plan = "pro",
+  label = "Upgrade with Paddle",
   className = "",
-  variant = "gradient",
-}: UpgradeToProButtonProps) {
+  variant = "default",
+  size = "default",
+}: UpgradeButtonProps) {
   const [loading, setLoading] = useState(false);
   const { error: toastError } = useToast();
 
   const handleUpgrade = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/checkout", {
+      const res = await fetch("/api/paddle/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ lookupKey }),
+        body: JSON.stringify({ plan }),
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Checkout failed");
-      }
-
-      if (data.url) {
-        window.location.href = data.url;
-        return;
-      }
-
-      throw new Error("No checkout URL returned");
+      if (!res.ok) throw new Error(data.error || "Checkout failed");
+      if (!data.url) throw new Error("No checkout URL returned");
+      window.location.href = data.url;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Checkout failed";
-      toastError("Upgrade failed", message);
+      toastError("Upgrade failed", err instanceof Error ? err.message : "Checkout failed");
     } finally {
       setLoading(false);
     }
   };
 
-  const baseStyles =
-    "inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60";
-  const variantStyles =
-    variant === "gradient"
-      ? "bg-gradient-to-r from-gray-900 to-gray-700 text-white shadow-sm hover:from-gray-800 hover:to-gray-600"
-      : "bg-gray-900 text-white hover:bg-gray-800";
-
   return (
-    <button
+    <Button
       type="button"
+      variant={variant}
+      size={size}
       onClick={handleUpgrade}
       disabled={loading}
-      className={`${baseStyles} ${variantStyles} ${className}`}
+      className={className}
     >
-      {loading ? (
-        <Loader2 size={18} className="animate-spin" />
-      ) : (
-        <Sparkles size={18} />
-      )}
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
       {loading ? "Redirecting…" : label}
-    </button>
+    </Button>
   );
 }

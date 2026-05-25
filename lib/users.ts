@@ -214,6 +214,10 @@ export async function createOrUpdateUser({
         });
 
     await mirrorToLocalJson(cleanEmail, name, hash, salt, false);
+
+    const { upsertSaasUserOnAuth } = await import("@/lib/saas-user");
+    await upsertSaasUserOnAuth({ email: cleanEmail, name });
+
     return user;
   } catch (err) {
     if (err instanceof Error && err.message === "User already exists") throw err;

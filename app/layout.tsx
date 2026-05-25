@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import AuthProvider from "@/components/providers/AuthProvider";
 import { SubscriptionProvider } from "@/components/providers/SubscriptionProvider";
 import UpgradeModal from "@/components/UpgradeModal";
+import { inter } from "@/lib/fonts";
 
 export const metadata: Metadata = {
   title: "SmartCV.AZ",
@@ -17,8 +18,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="az">
-      <body>
+    <html lang="az" className={inter.variable}>
+      <body className={inter.className}>
         <AuthProvider>
           <SubscriptionProvider>
             {children}

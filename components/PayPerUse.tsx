@@ -3,21 +3,10 @@
 import { useState } from "react";
 import { FileDown, Sparkles, Target } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-// `CheckoutProduct` is not exported in this repo version.
-// Keep the UI functional by using `string` product IDs.
-
-type CheckoutProduct = string;
-
 import SettingsCard from "@/components/account/ui/SettingsCard";
 import SettingsButton from "@/components/account/ui/SettingsButton";
 
-const ITEMS: {
-  id: CheckoutProduct;
-  label: string;
-  price: string;
-  description: string;
-  icon: typeof FileDown;
-}[] = [
+const ITEMS = [
   {
     id: "cv_export",
     label: "CV Export",
@@ -45,11 +34,11 @@ export default function PayPerUse() {
   const { error: toastError } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
 
-  const handlePurchase = async (product: CheckoutProduct) => {
+  const handlePurchase = async (product: string) => {
     setLoading(product);
     toastError(
       "Coming soon",
-      "One-time add-ons will use Stripe Payment Links. Use Upgrade to Pro for subscriptions."
+      "One-time add-ons will be available via Paddle. Upgrade to Basic or Pro for full access."
     );
     setLoading(null);
   };

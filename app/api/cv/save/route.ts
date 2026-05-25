@@ -3,7 +3,8 @@ import { DatabaseOperations } from '@/lib/models';
 import { createNotification, notificationMessages } from '@/lib/notifications';
 import { getAuthenticatedUser } from '@/lib/session';
 import { logger } from '@/lib/logger';
-import { checkCanCreateCV } from '@/lib/plan-limits';
+import { assertCanCreateCV, syncAndIncrementCvUsed } from "@/lib/cv-limit";
+import { upsertSaasUserOnAuth } from "@/lib/saas-user";
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +15,8 @@ export async function POST(req: NextRequest) {
     if (!user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    await upsertSaasUserOnAuth({ email: user.email, name: user.name });
 
     const { cvData, status = 'draft', notify = true } = await req.json();
 
@@ -32,25 +35,25 @@ export async function POST(req: NextRequest) {
       // If Mongo is unavailable we can't tell — treat as insert (stricter).
     }
 
-    const decision = await checkCanCreateCV(user.email, {
+    const decision = await assertCanCreateCV(user.email, {
       existingCvWillBeUpdated,
     });
-    if (!decision.ok) {
-      logger.warn('CV creation blocked: plan limit reached', 'cv-api', {
+    if (!decision.allowed) {
+      logger.warn("CV creation blocked", "cv-api", {
         userId: user.email,
-        plan: decision.plan,
-        cvCount: decision.cvCount,
-        cvLimit: decision.cvLimit,
+        code: decision.code,
+        plan: decision.user.plan,
+        cvUsed: decision.user.cvUsed,
+        cvLimit: decision.user.cvLimit,
       } as any);
       return NextResponse.json(
         {
-          error:
-            'You have reached the free plan limit of 1 CV. Upgrade to Pro to create more.',
-          code: 'CV_LIMIT_REACHED',
-          upgradeRequired: true,
-          plan: decision.plan,
-          cvCount: decision.cvCount,
-          cvLimit: decision.cvLimit,
+          error: decision.error,
+          code: decision.code,
+          upgradeRequired: decision.code === "CV_LIMIT_REACHED",
+          plan: decision.user.plan,
+          cvCount: decision.user.cvUsed,
+          cvLimit: decision.user.cvLimit,
         },
         { status: 403 }
       );
@@ -93,6 +96,13 @@ export async function POST(req: NextRequest) {
       }
 
       logger.info('CV saved successfully', 'cv-api', { cvId, userId: user.email });
+
+      // Sync cvUsed counter after successful save
+      try {
+        await syncAndIncrementCvUsed(user.email);
+      } catch {
+        /* non-blocking */
+      }
 
       return NextResponse.json({
         success: true,
