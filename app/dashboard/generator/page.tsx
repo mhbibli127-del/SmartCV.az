@@ -2,11 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import TemplateCatalog from '@/app/dashboard/builder/templatecatalog';
 import CVFormSection from '@/app/dashboard/builder/cvFormSection';
-import { Download, RefreshCw, Wand2, Palette, FormInput, Save, Check } from 'lucide-react';
+import Link from "next/link";
+import { Download, RefreshCw, Wand2, Palette, FormInput, Save, Check, ArrowUpRight } from 'lucide-react';
 import { generatePDF } from '@/lib/pdfGenerator';
 import { useToast } from '@/components/ui/use-toast';
 import { api } from '@/lib/api-client';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useAnalytics } from '@/lib/analytics';
 import { PageShell, PageHeader, Surface } from '@/components/ui/page-shell';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -16,12 +18,18 @@ export default function CVGeneratorPage() {
   const [config, setConfig] = useState({ templateId: '', color: '' });
   const [loading, setLoading] = useState<boolean>(false);
   const [generatedCV, setGeneratedCV] = useState<any>(null);
+  const [savedCvId, setSavedCvId] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
   const [preFilledData, setPreFilledData] = useState<any>(null);
   const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const { success, error: toastError } = useToast();
   const { incrementAI, incrementCV, openUpgradeModal, refreshSubscription } = useSubscription();
+  const { trackPageView } = useAnalytics();
+
+  useEffect(() => {
+    trackPageView('/dashboard/generator');
+  }, [trackPageView]);
 
   useEffect(() => {
     const templateData = localStorage.getItem('selectedTemplateData');
@@ -69,12 +77,17 @@ export default function CVGeneratorPage() {
     try {
       const response = await fetch('/api/cv/generate', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate CV');
+        const errData = await response.json().catch(() => ({}));
+        if (response.status === 403 && errData.code === 'AI_LIMIT_REACHED') {
+          openUpgradeModal();
+        }
+        throw new Error(errData.error || 'Failed to generate CV');
       }
 
       const data = await response.json();
@@ -93,43 +106,14 @@ export default function CVGeneratorPage() {
         },
       });
       success('Resume completed', 'Your AI-generated CV is ready.');
+      await refreshSubscription();
       
       setStep(3);
     } catch (err) {
       console.error('CV generation failed:', err);
-      setError('Failed to generate CV. Please try again.');
-      toastError('Generation failed', 'Using fallback preview data.');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      setGeneratedCV({
-        ...formData,
-        summary: `Professional ${formData.title} with extensive experience in digital systems architecture. Modern technologies and optimization methodologies applied to enhance business metrics.`,
-        experience: [
-          {
-            title: formData.title,
-            company: "Previous Company",
-            startDate: "Jan 2020",
-            endDate: "Present",
-            description: [
-              "Building high-load projects and critical cash modules from scratch in Next.js environment.",
-              "Designing advanced responsive interfaces and micro-interactive components using Tailwind CSS.",
-              "Structuring external API integrations to improve code quality within the team."
-            ]
-          }
-        ],
-        education: [
-          {
-            degree: "Bachelor's Degree",
-            university: "University Name",
-            graduationYear: "2020"
-          }
-        ],
-        skills: formData.rawSkills ? formData.rawSkills.split(',').map((s: string) => s.trim()) : ["JavaScript", "React", "Node.js"],
-        achievements: [
-          "Successfully delivered multiple high-impact projects",
-          "Demonstrated strong leadership abilities"
-        ]
-      });
-      setStep(3);
+      const message = err instanceof Error ? err.message : 'Failed to generate CV. Please try again.';
+      setError(message);
+      toastError('Generation failed', message);
     } finally {
       setLoading(false);
     }
@@ -141,6 +125,7 @@ export default function CVGeneratorPage() {
         message?: string;
         error?: string;
         code?: string;
+        cvId?: string;
       }>('/api/cv/save', {
         cvData: {
           templateId: Number(config.templateId) || 1,
@@ -152,6 +137,7 @@ export default function CVGeneratorPage() {
 
       if (ok) {
         refreshSubscription();
+        if (data?.cvId) setSavedCvId(String(data.cvId));
       } else if (status === 403 && data?.code === 'CV_LIMIT_REACHED') {
         toastError(
           'Free plan limit reached',
@@ -364,11 +350,27 @@ export default function CVGeneratorPage() {
                     </>
                   ) : null}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button variant="outline" onClick={handleRegenerate}>
                     <RefreshCw className="h-4 w-4" />
                     Regenerate
                   </Button>
+                  {savedCvId && (
+                    <>
+                      <Button variant="outline" asChild>
+                        <Link href={`/dashboard/builder?id=${savedCvId}&mode=form`}>
+                          Edit in Builder
+                          <ArrowUpRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      <Button variant="outline" asChild>
+                        <Link href={`/dashboard/builder/editor?id=${savedCvId}`}>
+                          Visual Editor
+                          <ArrowUpRight className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </>
+                  )}
                   <Button onClick={handleDownload}>
                     <Download className="h-4 w-4" />
                     Download PDF

@@ -1,122 +1,104 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { DatabaseOperations } from '@/lib/models';
-import { createNotification, notificationMessages } from '@/lib/notifications';
-import { getAuthenticatedUser } from '@/lib/session';
-import { logger } from '@/lib/logger';
+import { NextRequest, NextResponse } from "next/server";
+import { createNotification, notificationMessages } from "@/lib/notifications";
+import { getAuthenticatedUser } from "@/lib/session";
+import { logger } from "@/lib/logger";
 import { assertCanCreateCV, syncAndIncrementCvUsed } from "@/lib/cv-limit";
 import { upsertSaasUserOnAuth } from "@/lib/saas-user";
+import {
+  createCV,
+  updateCVById,
+  getCVById,
+} from "@/lib/cv-service";
+import { buildContentFromPayload, titleFromContent } from "@/lib/cv-normalizer";
 
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
     const user = await getAuthenticatedUser(req);
-    
     if (!user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     await upsertSaasUserOnAuth({ email: user.email, name: user.name });
 
-    const { cvData, status = 'draft', notify = true } = await req.json();
+    const body = await req.json();
+    const { cvData, status = "draft", notify = true, cvId, title } = body;
+    const cvStatus = status === "completed" ? "completed" : "draft";
 
-    logger.info('Saving CV for user', 'cv-api', { userId: user.email });
+    const content = buildContentFromPayload(cvData ?? {});
 
-    const cvStatus = status === 'completed' ? 'completed' : 'draft';
+    if (cvId) {
+      const existing = await getCVById(user.email, cvId);
+      if (!existing) {
+        return NextResponse.json({ error: "CV not found" }, { status: 404 });
+      }
 
-    // Determine if this save will update an existing row or insert a new one.
-    // The Mongo upsert keys on (userId, status), so any save against an
-    // existing draft/completed row is an update — always allowed.
-    let existingCvWillBeUpdated = false;
-    try {
-      const existing = await DatabaseOperations.getUserCVs(user.email);
-      existingCvWillBeUpdated = existing.some((c) => c.status === cvStatus);
-    } catch {
-      // If Mongo is unavailable we can't tell — treat as insert (stricter).
+      const updated = await updateCVById(user.email, cvId, {
+        title: title ?? titleFromContent(content),
+        templateId: cvData?.templateId,
+        content,
+        status: cvStatus,
+      });
+
+      return NextResponse.json({
+        success: true,
+        cvId,
+        status: cvStatus,
+        message: "CV updated",
+        cv: updated,
+      });
     }
 
-    const decision = await assertCanCreateCV(user.email, {
-      existingCvWillBeUpdated,
-    });
+    const decision = await assertCanCreateCV(user.email);
     if (!decision.allowed) {
-      logger.warn("CV creation blocked", "cv-api", {
-        userId: user.email,
-        code: decision.code,
-        plan: decision.user.plan,
-        cvUsed: decision.user.cvUsed,
-        cvLimit: decision.user.cvLimit,
-      } as any);
       return NextResponse.json(
         {
           error: decision.error,
           code: decision.code,
           upgradeRequired: decision.code === "CV_LIMIT_REACHED",
           plan: decision.user.plan,
-          cvCount: decision.user.cvUsed,
-          cvLimit: decision.user.cvLimit,
         },
         { status: 403 }
       );
     }
 
-    try {
-      const cvRecord = {
+    const created = await createCV(user.email, {
+      title: title ?? titleFromContent(content),
+      templateId: cvData?.templateId ?? 1,
+      content,
+      status: cvStatus,
+    });
+
+    let notification = null;
+    if (notify) {
+      notification = await createNotification({
         userId: user.email,
-        userEmail: user.email,
-        templateId: cvData?.templateId || 1,
-        data: {
-          sections: cvData?.sections,
-          templateName: cvData?.templateName,
-          metadata: cvData?.metadata,
-          generatorData: cvData?.generatorData,
-        },
-        status: cvStatus as 'draft' | 'completed',
-      };
-
-      const result = await DatabaseOperations.upsertUserCV(cvRecord);
-      const cvId = result.insertedId?.toString();
-
-      let notification = null;
-      if (notify) {
-        if (cvStatus === 'completed') {
-          notification = await createNotification({
-            userId: user.email,
-            type: 'resume_complete',
-            title: notificationMessages.resumeComplete.title,
-            message: notificationMessages.resumeComplete.message,
-          });
-        } else {
-          notification = await createNotification({
-            userId: user.email,
-            type: 'cv_saved',
-            title: notificationMessages.cvSaved.title,
-            message: notificationMessages.cvSaved.message,
-          });
-        }
-      }
-
-      logger.info('CV saved successfully', 'cv-api', { cvId, userId: user.email });
-
-      // Sync cvUsed counter after successful save
-      try {
-        await syncAndIncrementCvUsed(user.email);
-      } catch {
-        /* non-blocking */
-      }
-
-      return NextResponse.json({
-        success: true,
-        cvId,
-        status: cvStatus,
-        notification,
-        message: 'CV saved successfully',
+        type: cvStatus === "completed" ? "resume_complete" : "cv_saved",
+        title:
+          cvStatus === "completed"
+            ? notificationMessages.resumeComplete.title
+            : notificationMessages.cvSaved.title,
+        message:
+          cvStatus === "completed"
+            ? notificationMessages.resumeComplete.message
+            : notificationMessages.cvSaved.message,
       });
-    } catch (dbError) {
-      logger.warn('Database unavailable, saving to localStorage fallback', 'cv-api', dbError as Error);
-      return NextResponse.json({ success: true, message: 'CV saved (local fallback)' });
     }
+
+    await syncAndIncrementCvUsed(user.email).catch(() => {});
+
+    logger.info("CV saved", "cv-api", { cvId: created.id, userId: user.email });
+
+    return NextResponse.json({
+      success: true,
+      cvId: created.id,
+      status: cvStatus,
+      notification,
+      message: "CV saved successfully",
+    });
   } catch (error) {
-    logger.error('Error saving CV:', 'cv-api', error as Error);
-    return NextResponse.json({ error: 'Failed to save CV' }, { status: 500 });
+    logger.error("Error saving CV:", "cv-api", error as Error);
+    return NextResponse.json({ error: "Failed to save CV" }, { status: 500 });
   }
 }

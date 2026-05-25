@@ -10,11 +10,13 @@ interface CvItem {
   title: string;
   status: string;
   updatedAt: string;
+  mode?: string;
 }
 
 interface RecentActivityProps {
   cvs?: CvItem[];
   loading?: boolean;
+  editHref?: (cv: CvItem) => string;
 }
 
 function formatRelative(dateStr: string): string {
@@ -31,7 +33,7 @@ function formatRelative(dateStr: string): string {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-export default function RecentActivity({ cvs, loading }: RecentActivityProps) {
+export default function RecentActivity({ cvs, loading, editHref }: RecentActivityProps) {
   const router = useRouter();
 
   const activities = useMemo(() => {
@@ -45,8 +47,9 @@ export default function RecentActivity({ cvs, loading }: RecentActivityProps) {
         title: cv.title,
         description: cv.status === "completed" ? "Marked complete" : "Saved as draft",
         time: formatRelative(cv.updatedAt),
+        href: editHref ? editHref(cv) : `/dashboard/builder?id=${cv.id}`,
       }));
-  }, [cvs]);
+  }, [cvs, editHref]);
 
   return (
     <Surface padding>
@@ -60,7 +63,7 @@ export default function RecentActivity({ cvs, loading }: RecentActivityProps) {
           onClick={() => router.push("/dashboard/analytics")}
           className="text-xs font-medium text-zinc-500 transition-colors hover:text-zinc-900"
         >
-          View all
+          View analytics
         </button>
       </div>
 
@@ -77,23 +80,21 @@ export default function RecentActivity({ cvs, loading }: RecentActivityProps) {
       ) : (
         <div className="space-y-1">
           {activities.map((activity) => (
-            <div
+            <button
               key={activity.id}
-              className="flex items-center gap-3 rounded-[10px] px-2 py-2.5 transition-colors hover:bg-zinc-50"
+              type="button"
+              onClick={() => router.push(activity.href)}
+              className="flex w-full items-center gap-3 rounded-[10px] px-2 py-2.5 text-left transition-colors hover:bg-zinc-50"
             >
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-zinc-100">
                 <FileText className="h-3.5 w-3.5 text-zinc-500" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-zinc-900">
-                  {activity.title}
-                </p>
+                <p className="truncate text-[13px] font-medium text-zinc-900">{activity.title}</p>
                 <p className="text-xs text-zinc-400">{activity.description}</p>
               </div>
-              <span className="shrink-0 text-xs tabular-nums text-zinc-400">
-                {activity.time}
-              </span>
-            </div>
+              <span className="shrink-0 text-xs tabular-nums text-zinc-400">{activity.time}</span>
+            </button>
           ))}
         </div>
       )}

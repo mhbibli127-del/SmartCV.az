@@ -9,11 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  type UserPlan,
-  PLAN_CV_LIMITS,
-  PLAN_AI_LIMITS,
-} from "@/lib/user-plans";
+import { type UserPlan, PLAN_CV_LIMITS, PLAN_AI_LIMITS } from "@/lib/user-plans";
 import { useSession } from "next-auth/react";
 import { shouldFetchAuthenticatedApis } from "@/lib/auth-client";
 
@@ -42,24 +38,16 @@ interface SubscriptionContextValue {
   resetUsage: () => void;
 }
 
-const STORAGE_USAGE = "smartcv_usage";
-
 const SubscriptionContext = createContext<SubscriptionContextValue | null>(null);
-
-function loadUsage(): UsageState {
-  if (typeof window === "undefined") return { cvCount: 0, aiCount: 0 };
-  try {
-    const raw = localStorage.getItem(STORAGE_USAGE);
-    if (raw) return JSON.parse(raw);
-  } catch {
-    /* ignore */
-  }
-  return { cvCount: 0, aiCount: 0 };
-}
 
 function normalizePlan(plan: string): UserPlan {
   if (plan === "basic" || plan === "pro") return plan;
   return "free";
+}
+
+function resolveLimit(value: number | null | undefined, fallback: number): number {
+  if (value === null || value === undefined) return fallback;
+  return value;
 }
 
 export function SubscriptionProvider({ children }: { children: ReactNode }) {
@@ -68,17 +56,17 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   const [subscriptionPlan, setSubscriptionPlan] = useState("free");
   const [subscriptionStatus, setSubscriptionStatus] = useState("active");
   const [usage, setUsage] = useState<UsageState>({ cvCount: 0, aiCount: 0 });
+  const [limits, setLimits] = useState({ maxCV: PLAN_CV_LIMITS.free, maxAI: PLAN_AI_LIMITS.free });
   const [isLoading, setIsLoading] = useState(true);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
-
-  const maxCV = PLAN_CV_LIMITS[plan];
-  const maxAI = PLAN_AI_LIMITS[plan];
 
   const refreshSubscription = useCallback(async () => {
     if (!shouldFetchAuthenticatedApis(status)) {
       setPlan("free");
       setSubscriptionPlan("free");
       setSubscriptionStatus("active");
+      setUsage({ cvCount: 0, aiCount: 0 });
+      setLimits({ maxCV: PLAN_CV_LIMITS.free, maxAI: PLAN_AI_LIMITS.free });
       return;
     }
     try {
@@ -93,75 +81,73 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
         setPlan(nextPlan);
         setSubscriptionPlan(data.subscriptionPlan ?? "free");
         setSubscriptionStatus(data.subscriptionStatus ?? data.status ?? "active");
-        if (data.usage && typeof data.usage.cvCount === "number") {
-          setUsage((prev) => {
-            const next = { ...prev, cvCount: data.usage.cvCount };
-            localStorage.setItem(STORAGE_USAGE, JSON.stringify(next));
-            return next;
-          });
-        }
+
+        const cvCount = data.usage?.cvCount ?? data.usage?.cvUsed ?? 0;
+        const aiCount = data.usage?.aiCount ?? data.usage?.aiUsed ?? 0;
+        setUsage({ cvCount, aiCount });
+
+        const maxCV =
+          data.limits?.maxCV === null
+            ? Infinity
+            : resolveLimit(data.limits?.maxCV, PLAN_CV_LIMITS[nextPlan]);
+        const maxAI =
+          data.limits?.maxAI === null
+            ? Infinity
+            : resolveLimit(data.limits?.maxAI, PLAN_AI_LIMITS[nextPlan]);
+        setLimits({ maxCV, maxAI });
       }
     } catch {
-      /* keep cached */
+      /* keep last known server state */
     }
   }, [status]);
 
   useEffect(() => {
-    setUsage(loadUsage());
     refreshSubscription().finally(() => setIsLoading(false));
   }, [refreshSubscription]);
-
-  const persistUsage = useCallback((next: UsageState) => {
-    setUsage(next);
-    localStorage.setItem(STORAGE_USAGE, JSON.stringify(next));
-  }, []);
 
   const openUpgradeModal = useCallback(() => setUpgradeModalOpen(true), []);
   const closeUpgradeModal = useCallback(() => setUpgradeModalOpen(false), []);
 
   const canUseAI = useCallback(() => {
-    if (!Number.isFinite(maxAI)) return true;
-    return usage.aiCount < maxAI;
-  }, [maxAI, usage.aiCount]);
+    if (!Number.isFinite(limits.maxAI)) return true;
+    if (limits.maxAI === 0) return false;
+    return usage.aiCount < limits.maxAI;
+  }, [limits.maxAI, usage.aiCount]);
 
   const canCreateCV = useCallback(() => {
-    if (!Number.isFinite(maxCV)) return true;
-    return usage.cvCount < maxCV;
-  }, [maxCV, usage.cvCount]);
+    if (!Number.isFinite(limits.maxCV)) return true;
+    return usage.cvCount < limits.maxCV;
+  }, [limits.maxCV, usage.cvCount]);
 
   const incrementAI = useCallback(() => {
     if (!canUseAI()) {
       setUpgradeModalOpen(true);
       return false;
     }
-    if (!Number.isFinite(maxAI)) return true;
-    persistUsage({ ...usage, aiCount: usage.aiCount + 1 });
     return true;
-  }, [canUseAI, maxAI, usage, persistUsage]);
+  }, [canUseAI]);
 
   const incrementCV = useCallback(() => {
     if (!canCreateCV()) {
       setUpgradeModalOpen(true);
       return false;
     }
-    if (!Number.isFinite(maxCV)) return true;
-    persistUsage({ ...usage, cvCount: usage.cvCount + 1 });
     return true;
-  }, [canCreateCV, maxCV, usage, persistUsage]);
+  }, [canCreateCV]);
 
   const aiRemaining = useCallback(() => {
-    if (!Number.isFinite(maxAI)) return "unlimited" as const;
-    return Math.max(0, maxAI - usage.aiCount);
-  }, [maxAI, usage.aiCount]);
+    if (!Number.isFinite(limits.maxAI)) return "unlimited" as const;
+    return Math.max(0, limits.maxAI - usage.aiCount);
+  }, [limits.maxAI, usage.aiCount]);
 
   const cvRemaining = useCallback(() => {
-    if (!Number.isFinite(maxCV)) return "unlimited" as const;
-    return Math.max(0, maxCV - usage.cvCount);
-  }, [maxCV, usage.cvCount]);
+    if (!Number.isFinite(limits.maxCV)) return "unlimited" as const;
+    return Math.max(0, limits.maxCV - usage.cvCount);
+  }, [limits.maxCV, usage.cvCount]);
 
   const resetUsage = useCallback(() => {
-    persistUsage({ cvCount: 0, aiCount: 0 });
-  }, [persistUsage]);
+    setUsage({ cvCount: 0, aiCount: 0 });
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -169,10 +155,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       subscriptionPlan,
       subscriptionStatus,
       usage,
-      limits: {
-        maxCV: Number.isFinite(maxCV) ? maxCV : Infinity,
-        maxAI: Number.isFinite(maxAI) ? maxAI : Infinity,
-      },
+      limits,
       isLoading,
       upgradeModalOpen,
       refreshSubscription,
@@ -191,8 +174,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
       subscriptionPlan,
       subscriptionStatus,
       usage,
-      maxCV,
-      maxAI,
+      limits,
       isLoading,
       upgradeModalOpen,
       refreshSubscription,
@@ -209,9 +191,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <SubscriptionContext.Provider value={value}>
-      {children}
-    </SubscriptionContext.Provider>
+    <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>
   );
 }
 

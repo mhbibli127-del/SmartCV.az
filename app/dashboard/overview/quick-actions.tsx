@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FileEdit, Wand2, Library, TrendingUp, ArrowUpRight } from "lucide-react";
+import { FileEdit, Wand2, Library, TrendingUp, ArrowUpRight, LayoutTemplate } from "lucide-react";
 import { Surface } from "@/components/ui/page-shell";
 
 const ACTIONS = [
@@ -16,6 +16,12 @@ const ACTIONS = [
     label: "AI Generator",
     description: "Generate with AI",
     href: "/dashboard/generator",
+  },
+  {
+    icon: LayoutTemplate,
+    label: "Visual Editor",
+    description: "Canva-style canvas",
+    href: "/dashboard/builder/editor",
   },
   {
     icon: Library,

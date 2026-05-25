@@ -1,39 +1,61 @@
 "use client";
 
 import { useState } from "react";
-import { Laptop, Monitor, Smartphone } from "lucide-react";
+import { Monitor } from "lucide-react";
 import SettingsCard from "./ui/SettingsCard";
 import SettingsButton from "./ui/SettingsButton";
-import ToggleSwitch from "./ui/ToggleSwitch";
 import { useToast } from "@/components/ui/use-toast";
 
-const MOCK_SESSIONS = [
-  { id: "1", device: "Windows PC", browser: "Chrome", location: "Baku, AZ", lastActive: "Active now", icon: Monitor, current: true },
-  { id: "2", device: "iPhone 15", browser: "Safari", location: "Baku, AZ", lastActive: "2 hours ago", icon: Smartphone, current: false },
-  { id: "3", device: "MacBook Pro", browser: "Firefox", location: "Remote", lastActive: "3 days ago", icon: Laptop, current: false },
-];
-
 export default function SecuritySection() {
-  const { success } = useToast();
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const { success, error: toastError } = useToast();
   const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
   const [savingPassword, setSavingPassword] = useState(false);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwords.new !== passwords.confirm) return;
+    if (passwords.new !== passwords.confirm) {
+      toastError("Passwords don't match", "Please confirm your new password.");
+      return;
+    }
+    if (passwords.new.length < 8) {
+      toastError("Weak password", "Use at least 8 characters.");
+      return;
+    }
+
     setSavingPassword(true);
-    await new Promise((r) => setTimeout(r, 600));
-    setSavingPassword(false);
-    setPasswords({ current: "", new: "", confirm: "" });
-    success("Password updated", "Your password has been changed.");
+    try {
+      const res = await fetch("/api/user/password", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: passwords.current,
+          newPassword: passwords.new,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === "OAUTH_ONLY") {
+          toastError("Google account", data.error);
+        } else {
+          toastError("Update failed", data.error || "Could not change password.");
+        }
+        return;
+      }
+      setPasswords({ current: "", new: "", confirm: "" });
+      success("Password updated", "Your password has been changed.");
+    } catch {
+      toastError("Update failed", "Something went wrong. Try again.");
+    } finally {
+      setSavingPassword(false);
+    }
   };
 
   return (
     <div className="space-y-6">
       <SettingsCard
         title="Change password"
-        description="Use a strong password you don't use elsewhere."
+        description="Use a strong password you don't use elsewhere. Google sign-in accounts cannot set a password here."
         footer={
           <SettingsButton type="submit" form="change-password-form" disabled={savingPassword}>
             {savingPassword ? "Updating…" : "Update password"}
@@ -54,6 +76,7 @@ export default function SecuritySection() {
                 className="w-full rounded-xl border border-gray-300 px-4 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-200"
                 required
                 minLength={field !== "current" ? 8 : undefined}
+                autoComplete={field === "current" ? "current-password" : "new-password"}
               />
             </div>
           ))}
@@ -62,49 +85,21 @@ export default function SecuritySection() {
           )}
         </form>
       </SettingsCard>
-      <SettingsCard title="Two-factor authentication" description="Add an extra layer of security.">
-        <ToggleSwitch
-          label="Enable two-factor authentication"
-          description="Require a verification code when signing in."
-          enabled={twoFactorEnabled}
-          onChange={setTwoFactorEnabled}
-        />
-      </SettingsCard>
-      <SettingsCard
-        title="Active sessions"
-        description="Devices where you're currently signed in."
-        footer={
-          <SettingsButton variant="secondary" onClick={() => success("Sessions revoked", "Logged out from all other devices.")}>
-            Logout from all devices
-          </SettingsButton>
-        }
-      >
-        <ul className="divide-y divide-gray-100">
-          {MOCK_SESSIONS.map((session) => {
-            const Icon = session.icon;
-            return (
-              <li key={session.id} className="flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-4">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
-                    <Icon size={18} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {session.device}{" "}
-                      {session.current && (
-                        <span className="ml-1 rounded-md bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-600/20">
-                          This device
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-sm text-gray-500">{session.browser} · {session.location}</p>
-                  </div>
-                </div>
-                <span className="shrink-0 text-xs text-gray-500">{session.lastActive}</span>
-              </li>
-            );
-          })}
-        </ul>
+      <SettingsCard title="Active session" description="You are signed in on this device.">
+        <div className="flex items-center gap-4 py-2">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gray-100 text-gray-600">
+            <Monitor size={18} />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-900">
+              This device{" "}
+              <span className="ml-1 rounded-md bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-600/20">
+                Active now
+              </span>
+            </p>
+            <p className="text-sm text-gray-500">Sign out from the sidebar to end your session.</p>
+          </div>
+        </div>
       </SettingsCard>
     </div>
   );

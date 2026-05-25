@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAI } from "@/lib/openai";
+import { requireAiAccess, recordAiUsage, aiErrorResponse } from "@/lib/ai-route-guard";
 
 function safeParse(value: unknown) {
   if (typeof value === "string") {
@@ -21,13 +22,14 @@ function stringArray(raw: unknown) {
 
 export async function POST(req: NextRequest) {
   try {
+    const email = await requireAiAccess(req);
     const openai = getOpenAI();
     const body = await req.json();
     const cv = body?.cv;
     const targetJob = typeof body?.targetJob === "string" ? body.targetJob : "";
 
     if (!cv) {
-      return NextResponse.json({ missingSkills: [], roadmap: [] }, { status: 400 });
+      return NextResponse.json({ error: "CV required" }, { status: 400 });
     }
 
     const completion = await openai.chat.completions.create({
@@ -49,11 +51,13 @@ export async function POST(req: NextRequest) {
     const raw = completion.choices?.[0]?.message?.content ?? "";
     const parsed = safeParse(raw) as Record<string, unknown>;
 
+    await recordAiUsage(email);
+
     return NextResponse.json({
       missingSkills: stringArray(parsed?.missingSkills),
       roadmap: stringArray(parsed?.roadmap),
     });
-  } catch {
-    return NextResponse.json({ missingSkills: [], roadmap: [] }, { status: 500 });
+  } catch (err) {
+    return aiErrorResponse(err);
   }
 }

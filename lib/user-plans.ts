@@ -68,7 +68,7 @@ export function getPaddlePriceId(plan: "basic" | "pro"): string | null {
 
 /** AI generation limits per plan (server-enforced in lib/ai-limit.ts). */
 export const PLAN_AI_LIMITS: Record<UserPlan, number> = {
-  free: 3,
+  free: 0,
   basic: 25,
   pro: Number.MAX_SAFE_INTEGER,
 };

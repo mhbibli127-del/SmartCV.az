@@ -1,23 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAI } from "@/lib/openai";
-
-const defaultJobs = [
-  {
-    title: "Product Design Lead",
-    description:
-      "Lead a product design team to execute enterprise SaaS experiences, define UI systems, and optimize conversion funnels for B2B workflows.",
-  },
-  {
-    title: "Growth Product Manager",
-    description:
-      "Own product roadmaps for high-growth SaaS firms, align feature strategy with user research, and deliver measurable business outcomes.",
-  },
-  {
-    title: "AI Resume Strategist",
-    description:
-      "Build AI-first resume products and career automation tools for talent acquisition, ATS optimization, and candidate success.",
-  },
-];
+import { requireAiAccess, recordAiUsage, aiErrorResponse } from "@/lib/ai-route-guard";
 
 function safeParse(value: unknown) {
   if (typeof value === "string") {
@@ -39,13 +22,29 @@ function stringArray(raw: unknown) {
 
 export async function POST(req: NextRequest) {
   try {
+    const email = await requireAiAccess(req);
     const openai = getOpenAI();
     const body = await req.json();
     const cv = body?.cv;
-    const jobs = Array.isArray(body?.jobs) ? body.jobs : defaultJobs;
+    const jobDescription =
+      typeof body?.jobDescription === "string" ? body.jobDescription : "";
 
     if (!cv) {
-      return NextResponse.json({ matchScore: 0, missingSkills: [], suggestedJobs: [] }, { status: 400 });
+      return NextResponse.json({ error: "CV required", matchScore: 0 }, { status: 400 });
+    }
+
+    const jobs =
+      Array.isArray(body?.jobs) && body.jobs.length > 0
+        ? body.jobs
+        : jobDescription
+          ? [{ title: "Target role", description: jobDescription }]
+          : [];
+
+    if (jobs.length === 0) {
+      return NextResponse.json(
+        { error: "Job description required", matchScore: 0 },
+        { status: 400 }
+      );
     }
 
     const completion = await openai.chat.completions.create({
@@ -54,7 +53,7 @@ export async function POST(req: NextRequest) {
         {
           role: "system",
           content:
-            "You are a career matching engine. Compare a structured CV with job descriptions and return JSON only with matchScore, missingSkills, and suggestedJobs.",
+            "You are a career matching engine. Compare a structured CV with job descriptions and return JSON only with matchScore (0-100), missingSkills, and suggestedJobs.",
         },
         {
           role: "user",
@@ -67,15 +66,20 @@ export async function POST(req: NextRequest) {
     const raw = completion.choices?.[0]?.message?.content ?? "";
     const parsed = safeParse(raw) as Record<string, unknown>;
 
+    await recordAiUsage(email);
+
+    const matchScore =
+      typeof parsed?.matchScore === "number"
+        ? parsed.matchScore
+        : Number(parsed?.matchScore) || 0;
+
     return NextResponse.json({
-      matchScore:
-        typeof parsed?.matchScore === "number"
-          ? parsed.matchScore
-          : Number(parsed?.matchScore) || 0,
+      matchScore,
+      score: matchScore,
       missingSkills: stringArray(parsed?.missingSkills),
       suggestedJobs: stringArray(parsed?.suggestedJobs),
     });
-  } catch {
-    return NextResponse.json({ matchScore: 0, missingSkills: [], suggestedJobs: [] }, { status: 500 });
+  } catch (err) {
+    return aiErrorResponse(err);
   }
 }

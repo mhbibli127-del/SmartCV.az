@@ -1,33 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthenticatedUser } from "@/lib/session";
 import { getOpenAI } from "@/lib/openai";
-import { emptyCV, normalizeCv } from "@/lib/cv/cv-utils";
-import { assertCanUseAI, incrementAiUsed } from "@/lib/ai-limit";
+import { normalizeCv } from "@/lib/cv/cv-utils";
+import { requireAiAccess, recordAiUsage, aiErrorResponse } from "@/lib/ai-route-guard";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getAuthenticatedUser(req);
-    if (!user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const aiCheck = await assertCanUseAI(user.email);
-    if (!aiCheck.allowed) {
-      return NextResponse.json(
-        { error: aiCheck.error, code: aiCheck.code },
-        { status: 403 }
-      );
-    }
-
+    const email = await requireAiAccess(req);
     const openai = getOpenAI();
     const body = await req.json();
     const cv = body?.cv;
     const jobDescription = typeof body?.jobDescription === "string" ? body.jobDescription : "";
 
-    if (!cv || !jobDescription.trim()) {
-      return NextResponse.json(emptyCV, { status: 400 });
+    if (!cv) {
+      return NextResponse.json({ error: "CV required" }, { status: 400 });
+    }
+    if (!jobDescription.trim()) {
+      return NextResponse.json({ error: "Job description required" }, { status: 400 });
     }
 
     const completion = await openai.chat.completions.create({
@@ -36,7 +26,7 @@ export async function POST(req: NextRequest) {
         {
           role: "system",
           content:
-            "You are an expert career optimizer. Rewrite the CV to align with the provided job description, emphasize relevant keywords, and improve bullet points with measurable impact.",
+            "You are an expert career optimizer. Rewrite the CV to align with the provided job description, emphasize relevant keywords, and improve bullet points with measurable impact. Return JSON with name, email, skills, experience, education, summary.",
         },
         {
           role: "user",
@@ -49,10 +39,10 @@ export async function POST(req: NextRequest) {
     const raw = completion.choices?.[0]?.message?.content ?? "";
     const parsed = normalizeCv(raw);
 
-    await incrementAiUsed(user.email).catch(() => {});
+    await recordAiUsage(email);
 
     return NextResponse.json(parsed);
-  } catch {
-    return NextResponse.json(emptyCV, { status: 500 });
+  } catch (err) {
+    return aiErrorResponse(err);
   }
 }

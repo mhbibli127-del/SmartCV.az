@@ -146,43 +146,9 @@ Make the CV content impressive, ATS-optimized, and tailored to the ${targetIndus
     return NextResponse.json(completeCV);
   } catch (error) {
     console.error('Error generating CV:', error);
-    
-    // Fallback response if AI fails
-    return NextResponse.json({
-      summary: "Professional with extensive experience and a proven track record of success in delivering high-impact results.",
-      experience: [
-        {
-          title: title || "Professional",
-          company: "Previous Company",
-          startDate: "Jan 2020",
-          endDate: "Present",
-          description: [
-            "Led development of innovative solutions",
-            "Collaborated with cross-functional teams",
-            "Delivered high-impact projects"
-          ]
-        }
-      ],
-      education: [
-        {
-          degree: "Bachelor's Degree",
-          university: "University Name",
-          graduationYear: "2020"
-        }
-      ],
-      skills: rawSkills ? rawSkills.split(',').map((s: string) => s.trim()) : ["Communication", "Problem Solving", "Teamwork"],
-      achievements: [
-        "Successfully delivered multiple high-impact projects",
-        "Demonstrated strong leadership abilities"
-      ],
-      personal: {
-        fullName,
-        email,
-        phone,
-        location,
-        website,
-        title
-      }
-    });
+    return NextResponse.json(
+      { error: 'AI generation failed. Please try again.' },
+      { status: 500 }
+    );
   }
 }

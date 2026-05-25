@@ -11,12 +11,14 @@ import { PageShell, PageHeader, StatCard, Surface } from "@/components/ui/page-s
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAnalytics } from "@/lib/analytics";
 
 const PAGE_SIZE = 24;
 
 export default function ExamplesPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { trackPageView, trackSearch, trackTemplateSelect } = useAnalytics();
   const [examples, setExamples] = useState<CVExampleProfile[]>([]);
   const [categories, setCategories] = useState<string[]>(["All"]);
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -31,9 +33,24 @@ export default function ExamplesPage() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQuery(searchQuery), 280);
+    trackPageView("/dashboard/examples");
+  }, [trackPageView]);
+
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q !== null && q !== searchQuery) {
+      setSearchQuery(q);
+      setDebouncedQuery(q);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+      if (searchQuery.trim()) trackSearch(searchQuery.trim(), catalogTotal);
+    }, 280);
     return () => clearTimeout(t);
-  }, [searchQuery]);
+  }, [searchQuery, catalogTotal, trackSearch]);
 
   useEffect(() => {
     setPage(1);
@@ -69,6 +86,7 @@ export default function ExamplesPage() {
   }, [fetchExamples, reloadKey]);
 
   const handleUseExample = (example: CVExampleProfile) => {
+    trackTemplateSelect(parseInt(example.id.replace(/\D/g, ""), 10) || 0, example.name, example.category);
     sessionStorage.setItem(
       "smartcv_import_example",
       JSON.stringify({ cvContent: example.cvContent, template: example.template, name: example.name })

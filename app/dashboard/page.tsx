@@ -1,18 +1,22 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   FileText,
   Sparkles,
   Plus,
-  Loader2,
   ArrowUpRight,
   Wand2,
+  Trash2,
+  LayoutTemplate,
+  Loader2,
+  Target,
 } from "lucide-react";
 import QuickActions from "./overview/quick-actions";
 import RecentActivity from "./overview/recent-activity";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useAnalytics } from "@/lib/analytics";
 import { useCurrentUser, displayNameOf } from "@/hooks/useCurrentUser";
 import { useSession } from "next-auth/react";
 import { shouldFetchAuthenticatedApis } from "@/lib/auth-client";
@@ -26,6 +30,7 @@ interface CvItem {
   title: string;
   status: string;
   updatedAt: string;
+  mode?: string;
 }
 
 export default function DashboardPage() {
@@ -36,15 +41,50 @@ export default function DashboardPage() {
     cvRemaining,
     usage,
     limits,
+    openUpgradeModal,
+    refreshSubscription,
   } = useSubscription();
   const { user, loading: userLoading } = useCurrentUser();
   const { status } = useSession();
+  const { trackPageView } = useAnalytics();
   const [cvs, setCvs] = useState<CvItem[]>([]);
   const [loadingCvs, setLoadingCvs] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [userStats, setUserStats] = useState<{
+    profileViews: number;
+    atsScore: number;
+    lastEdited: string;
+  } | null>(null);
 
-  const isPro = plan === "pro";
+  const isPro = plan === "pro" || plan === "basic";
+
+  useEffect(() => {
+    trackPageView("/dashboard");
+  }, [trackPageView]);
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!shouldFetchAuthenticatedApis(status)) return;
+    let cancelled = false;
+    fetch("/api/user/stats", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) {
+          setUserStats({
+            profileViews: data.profileViews ?? 0,
+            atsScore: data.atsScore ?? 0,
+            lastEdited: data.lastEdited ?? "Never",
+          });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [status]);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -84,25 +124,65 @@ export default function DashboardPage() {
   const cvMax = Number.isFinite(limits.maxCV) ? limits.maxCV : null;
 
   const limitReached =
-    !isPro && typeof cvLeft === "number" && cvLeft === 0 && !planLoading;
+    plan === "free" && typeof cvLeft === "number" && cvLeft === 0 && !planLoading;
 
   const greeting = userLoading ? "Welcome back" : displayNameOf(user);
 
-  const completedCount = useMemo(
-    () => cvs.filter((c) => c.status === "completed").length,
-    [cvs]
-  );
+  const handleCreateCV = async () => {
+    if (limitReached) {
+      openUpgradeModal();
+      return;
+    }
+    setCreating(true);
+    try {
+      const res = await fetch("/api/cv", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === "CV_LIMIT_REACHED") openUpgradeModal();
+        throw new Error(data.error);
+      }
+      window.location.href = `/dashboard/builder?id=${data.cvId}`;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create CV");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteCV = async (id: string) => {
+    if (!confirm("Delete this CV? This cannot be undone.")) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/cv/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Delete failed");
+      setCvs((prev) => prev.filter((c) => c.id !== id));
+      refreshSubscription();
+    } catch {
+      setError("Could not delete CV");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const editHref = (cv: CvItem) =>
+    cv.mode === "visual"
+      ? `/dashboard/builder/editor?id=${cv.id}`
+      : `/dashboard/builder?id=${cv.id}`;
 
   return (
     <PageShell>
       <PageHeader
         eyebrow="Overview"
         title={`Good to see you, ${greeting.split(" ")[0]}`}
-        description={
-          user?.email
-            ? `Manage your CVs and track usage from your workspace.`
-            : "Build, refine, and export professional CVs with AI."
-        }
+        description="Manage your CVs and track usage from your workspace."
         action={
           !isPro && !planLoading ? (
             <UpgradeToProButton label="Upgrade" size="sm" />
@@ -110,10 +190,14 @@ export default function DashboardPage() {
         }
       />
 
-      {/* Stats row */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCard label="Total CVs" value={loadingCvs ? "—" : cvs.length} icon={FileText} />
-        <StatCard label="Completed" value={loadingCvs ? "—" : completedCount} hint="Ready to export" />
+        <StatCard
+          label="ATS readiness"
+          value={userStats ? `${userStats.atsScore}%` : "—"}
+          icon={Target}
+          hint={userStats?.lastEdited ? `Last edit ${userStats.lastEdited}` : undefined}
+        />
         <StatCard
           label="AI remaining"
           value={aiLeft === "unlimited" ? "∞" : String(aiLeft)}
@@ -122,24 +206,25 @@ export default function DashboardPage() {
         <StatCard
           label="Plan"
           value={planLoading ? "—" : plan}
-          hint={isPro ? "All features" : "Upgrade for more"}
+          hint={isPro ? "All features" : "Upgrade for AI"}
           icon={Wand2}
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
-        {/* CV list — wider column */}
         <Surface className="lg:col-span-3" padding>
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-zinc-900">Your CVs</h2>
               <p className="mt-0.5 text-xs text-zinc-500">Recent documents</p>
             </div>
-            <Button size="sm" asChild disabled={limitReached}>
-              <Link href="/dashboard/builder">
+            <Button size="sm" onClick={handleCreateCV} disabled={limitReached || creating}>
+              {creating ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
                 <Plus className="h-3.5 w-3.5" />
-                New CV
-              </Link>
+              )}
+              New CV
             </Button>
           </div>
 
@@ -159,37 +244,58 @@ export default function DashboardPage() {
               title="No CVs yet"
               description="Start with the builder or AI generator."
               action={
-                <Button asChild size="sm">
-                  <Link href="/dashboard/builder">Create your first CV</Link>
+                <Button size="sm" onClick={handleCreateCV} disabled={creating}>
+                  Create your first CV
                 </Button>
               }
             />
           ) : (
             <ul className="divide-y divide-black/[0.06]">
-              {cvs.slice(0, 6).map((cv) => (
+              {cvs.map((cv) => (
                 <li
                   key={cv.id}
-                  className="group flex items-center justify-between py-3.5 first:pt-0 last:pb-0"
+                  className="group flex items-center justify-between gap-3 py-3.5 first:pt-0 last:pb-0"
                 >
-                  <div className="min-w-0 pr-4">
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-zinc-900">{cv.title}</p>
-                    <p className="mt-0.5 text-xs capitalize text-zinc-400">
-                      {cv.status} ·{" "}
-                      {(() => {
-                        const d = new Date(cv.updatedAt);
-                        return Number.isFinite(d.getTime())
-                          ? d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-                          : "—";
-                      })()}
+                    <p className="mt-0.5 flex items-center gap-2 text-xs capitalize text-zinc-400">
+                      <span>{cv.status}</span>
+                      <span>·</span>
+                      <span>
+                        {new Date(cv.updatedAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                      {cv.mode === "visual" && (
+                        <>
+                          <span>·</span>
+                          <LayoutTemplate className="inline h-3 w-3" />
+                        </>
+                      )}
                     </p>
                   </div>
-                  <Link
-                    href="/dashboard/builder"
-                    className="flex items-center gap-1 text-xs font-medium text-zinc-500 opacity-0 transition-all group-hover:opacity-100 hover:text-zinc-900"
-                  >
-                    Edit
-                    <ArrowUpRight className="h-3 w-3" />
-                  </Link>
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={editHref(cv)}>
+                        Edit
+                        <ArrowUpRight className="h-3 w-3" />
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-red-500 hover:text-red-600"
+                      disabled={deletingId === cv.id}
+                      onClick={() => handleDeleteCV(cv.id)}
+                    >
+                      {deletingId === cv.id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -201,7 +307,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <RecentActivity cvs={cvs} loading={loadingCvs} />
+      <RecentActivity cvs={cvs} loading={loadingCvs} editHref={editHref} />
     </PageShell>
   );
 }

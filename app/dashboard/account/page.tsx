@@ -18,6 +18,7 @@ import type {
 import { useSubscription } from "@/hooks/useSubscription";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api-client";
+import { useAnalytics } from "@/lib/analytics";
 
 const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
   email: true,
@@ -51,6 +52,7 @@ function AccountPageContent() {
   const searchParams = useSearchParams();
   const { success, error: toastError } = useToast();
   const { refreshSubscription } = useSubscription();
+  const { trackPageView } = useAnalytics();
   const [activeSection, setActiveSection] = useState<AccountSectionId>("profile");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -64,6 +66,10 @@ function AccountPageContent() {
   const [savedProfile, setSavedProfile] = useState(profile);
   const [notifications, setNotifications] = useState<NotificationPrefs>(DEFAULT_NOTIFICATIONS);
   const [aiPrefs, setAiPrefs] = useState<AiPreferences>(DEFAULT_AI_PREFS);
+
+  useEffect(() => {
+    trackPageView("/dashboard/account");
+  }, [trackPageView]);
 
   useEffect(() => {
     const checkout = searchParams.get("checkout");
@@ -81,13 +87,23 @@ function AccountPageContent() {
   useEffect(() => {
     const loadUser = async () => {
       const { ok, data } = await api.get<{ email?: string; name?: string }>("/api/auth/me");
+      let bio = "";
+      try {
+        const profileRes = await fetch("/api/user/profile", { credentials: "include" });
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          bio = profileData.bio ?? "";
+        }
+      } catch {
+        /* optional */
+      }
       if (ok && data.email) {
         const email = data.email.toLowerCase().trim();
         const name = data.name || email.split("@")[0] || "User";
         const next: UserProfile = {
           name,
           email,
-          bio: "",
+          bio,
           avatarUrl: buildAvatarUrl(email),
         };
         setProfile(next);
@@ -124,6 +140,7 @@ function AccountPageContent() {
     try {
       const response = await fetch("/api/user/profile", {
         method: "PUT",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: profile.name, email: profile.email, bio: profile.bio }),
       });

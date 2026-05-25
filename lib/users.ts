@@ -319,6 +319,56 @@ export async function verifyUserCredentials(email: string, password: string) {
   return result.ok ? result.user : null;
 }
 
+export type PasswordChangeResult =
+  | { ok: true }
+  | { ok: false; error: string; code?: string };
+
+/** Change password for credentials users. OAuth-only users must set password first. */
+export async function changeUserPassword(
+  email: string,
+  currentPassword: string,
+  newPassword: string
+): Promise<PasswordChangeResult> {
+  if (newPassword.length < 8) {
+    return { ok: false, error: "Password must be at least 8 characters", code: "WEAK_PASSWORD" };
+  }
+
+  await migrateLocalUsersToPrisma();
+  const cleanEmail = normalizeEmail(email);
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
+    if (!user) return { ok: false, error: "User not found", code: "NOT_FOUND" };
+
+    if (!user.password) {
+      return {
+        ok: false,
+        error: "This account uses Google sign-in. Password change is not available.",
+        code: "OAUTH_ONLY",
+      };
+    }
+
+    const valid = await verifyStoredPassword(currentPassword, user.password);
+    if (!valid) {
+      return { ok: false, error: "Current password is incorrect", code: "WRONG_PASSWORD" };
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+    const { hash, salt } = hashPassword(newPassword);
+
+    await prisma.user.update({
+      where: { email: cleanEmail },
+      data: { password: hashed },
+    });
+
+    await mirrorToLocalJson(cleanEmail, user.name ?? cleanEmail, hash, salt, Boolean(user.emailVerified));
+    return { ok: true };
+  } catch (err) {
+    console.error("[users] changeUserPassword", err);
+    return { ok: false, error: "Failed to update password" };
+  }
+}
+
 /** Google / OAuth users are always treated as verified. */
 export function isUserVerified(user: UserRecord | null): boolean {
   if (!user) return false;

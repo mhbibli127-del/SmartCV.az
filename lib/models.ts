@@ -66,11 +66,13 @@ export interface UserProfile {
   userId: string;
   userEmail: string;
   name?: string;
+  bio?: string;
   avatar?: string;
   preferences: {
     theme: string;
     language: string;
     notifications: boolean;
+    phone?: string;
   };
   stats: {
     cvsCreated: number;

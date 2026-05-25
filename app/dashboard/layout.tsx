@@ -29,7 +29,7 @@ import {
   X,
 
   TrendingUp,
-
+  Palette,
 } from "lucide-react";
 
 import NotificationPanel from "@/components/NotificationPanel";
@@ -67,6 +67,7 @@ const navItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
 
   { name: "CV Builder", href: "/dashboard/builder", icon: FileEdit },
+  { name: "Visual Editor", href: "/dashboard/builder/editor", icon: Palette },
 
   { name: "AI Generator", href: "/dashboard/generator", icon: Wand2 },
 
@@ -232,7 +233,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {navItems.map((item) => {
 
-            const isActive = pathname === item.href;
+            const isActive =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`)) ||
+              (item.href === "/dashboard/builder" &&
+                pathname.startsWith("/dashboard/builder"));
 
             return (
 

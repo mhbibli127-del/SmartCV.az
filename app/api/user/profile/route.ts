@@ -1,26 +1,67 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getAuthenticatedUser } from '@/lib/session';
-import { DatabaseOperations } from '@/lib/models';
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthenticatedUser } from "@/lib/session";
+import { DatabaseOperations } from "@/lib/models";
+import prisma from "@/lib/prisma";
+
+export async function GET(req: NextRequest) {
+  try {
+    const user = await getAuthenticatedUser(req);
+    if (!user?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    let bio = "";
+    try {
+      const db = await import("@/lib/mongodb").then((m) => m.getDatabase());
+      const profile = await db.collection("profiles").findOne({ userId: user.email });
+      bio = (profile as { bio?: string } | null)?.bio ?? "";
+    } catch {
+      /* optional */
+    }
+
+    return NextResponse.json({
+      name: user.name,
+      email: user.email,
+      bio,
+    });
+  } catch (error) {
+    console.error("Error fetching profile:", error);
+    return NextResponse.json({ error: "Failed to fetch profile" }, { status: 500 });
+  }
+}
 
 export async function PUT(req: NextRequest) {
   try {
     const user = await getAuthenticatedUser(req);
-    
     if (!user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, email, phone } = await req.json();
+    const { name, email, phone, bio } = await req.json();
+    const cleanEmail = user.email.toLowerCase().trim();
+
+    if (name) {
+      try {
+        await prisma.user.update({
+          where: { email: cleanEmail },
+          data: { name: String(name).slice(0, 120) },
+        });
+      } catch {
+        /* Prisma optional */
+      }
+    }
 
     try {
       await DatabaseOperations.upsertUserProfile({
-        userId: user.email,
-        userEmail: user.email,
+        userId: cleanEmail,
+        userEmail: cleanEmail,
         name: name || user.name || undefined,
+        bio: typeof bio === "string" ? bio.slice(0, 500) : undefined,
         preferences: {
-          theme: 'light',
-          language: 'en',
+          theme: "light",
+          language: "en",
           notifications: true,
+          phone: typeof phone === "string" ? phone : undefined,
         },
         stats: {
           cvsCreated: 0,
@@ -29,16 +70,16 @@ export async function PUT(req: NextRequest) {
         },
       });
     } catch {
-      // Profile store optional when MongoDB is unavailable
+      /* Mongo optional */
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Profile updated successfully',
-      profile: { name, email: email || user.email, phone },
+      message: "Profile updated successfully",
+      profile: { name, email: email || user.email, phone, bio },
     });
   } catch (error) {
-    console.error('Error updating profile:', error);
-    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+    console.error("Error updating profile:", error);
+    return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
   }
 }

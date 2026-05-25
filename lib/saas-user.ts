@@ -47,7 +47,14 @@ async function db() {
   return SaasUser;
 }
 
-/** Find user by email — returns null if not found or Mongo unavailable. */
+export class SaasUserDbError extends Error {
+  constructor(message = "Database unavailable") {
+    super(message);
+    this.name = "SaasUserDbError";
+  }
+}
+
+/** Find user by email — returns null if not found. Throws on DB errors. */
 export async function findSaasUserByEmail(
   email: string
 ): Promise<SaasUserRecord | null> {
@@ -57,7 +64,7 @@ export async function findSaasUserByEmail(
     return doc ? toRecord(doc) : null;
   } catch (err) {
     console.error("[saas-user] findByEmail failed:", err);
-    return null;
+    throw new SaasUserDbError();
   }
 }
 
@@ -200,10 +207,11 @@ export async function applySubscriptionFromWebhook(params: {
     console.log(
       `[saas-user] Webhook applied plan=${params.plan} cvLimit=${cvLimit} email=${email}`
     );
-    return doc ? toRecord(doc) : null;
+    if (!doc) throw new SaasUserDbError("Failed to apply subscription");
+    return toRecord(doc);
   } catch (err) {
     console.error("[saas-user] applySubscription failed:", err);
-    return null;
+    throw err instanceof SaasUserDbError ? err : new SaasUserDbError();
   }
 }
 
