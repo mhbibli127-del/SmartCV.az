@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/session";
 import { findUserByEmail, isUserVerified } from "@/lib/users";
-import { signSessionToken } from "@/lib/token";
-import { setAuthStateCookie } from "@/lib/auth-cookie";
-import prisma from "@/lib/prisma";
+import {
+  attachSessionCookies,
+  ensureGoogleUser,
+} from "@/lib/google-session-bridge";
 
 export const dynamic = "force-dynamic";
-
-const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
 export async function GET(req: NextRequest) {
   try {
@@ -43,8 +42,9 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * Bridge a valid NextAuth (Google) session into our JWT + auth_state cookies
- * so all existing API routes work without rewriting every handler.
+ * Bridge a valid NextAuth (Google) session into JWT + auth_state cookies.
+ * Primary OAuth flow uses GET /api/auth/sync-session; this POST remains
+ * for client recovery when cookies are missing but NextAuth session exists.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -54,31 +54,12 @@ export async function POST(req: NextRequest) {
     }
 
     const email = auth.email.toLowerCase().trim();
-    let user = await findUserByEmail(email);
+    const user = await ensureGoogleUser({
+      email,
+      name: auth.name,
+      image: auth.image,
+    });
 
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          email,
-          name: auth.name ?? email.split("@")[0],
-          image: auth.image ?? null,
-          emailVerified: new Date(),
-          provider: "google",
-        },
-      });
-    } else if ("id" in user) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          ...(auth.name ? { name: auth.name } : {}),
-          ...(auth.image ? { image: auth.image } : {}),
-          emailVerified: user.emailVerified ?? new Date(),
-          provider: "google",
-        },
-      });
-    }
-
-    const token = signSessionToken({ email, verified: true });
     const response = NextResponse.json({
       success: true,
       email,
@@ -86,14 +67,7 @@ export async function POST(req: NextRequest) {
       image: ("image" in user ? user.image : null) ?? auth.image ?? null,
     });
 
-    response.cookies.set("token", token, {
-      httpOnly: true,
-      path: "/",
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: SESSION_MAX_AGE,
-    });
-    setAuthStateCookie(response, SESSION_MAX_AGE);
+    attachSessionCookies(response, email);
 
     return response;
   } catch (error: unknown) {

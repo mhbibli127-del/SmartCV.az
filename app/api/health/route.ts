@@ -25,6 +25,18 @@ export async function GET() {
     checks.queue = "unavailable";
   }
 
+  try {
+    if (process.env.MONGODB_URI) {
+      const { pingDatabase } = await import("@/lib/mongodb");
+      const mongo = await pingDatabase();
+      checks.mongodb = mongo.ok ? `ok (${mongo.latencyMs}ms)` : "degraded";
+    } else {
+      checks.mongodb = "not configured";
+    }
+  } catch {
+    checks.mongodb = "unavailable";
+  }
+
   if (process.env.DATABASE_URL?.startsWith("postgresql")) {
     checks.database = "configured";
   } else {

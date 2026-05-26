@@ -2,6 +2,7 @@ import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { isBuildPhase } from "@/lib/build";
 import { getNextAuthSecret, getNextAuthUrl } from "@/lib/env";
+import { ensureGoogleUser } from "@/lib/google-session-bridge";
 import { isGoogleOAuthConfigured } from "@/lib/google-oauth";
 
 let cachedOptions: NextAuthOptions | null = null;
@@ -14,43 +15,15 @@ function buildProviders() {
       clientId: process.env.GOOGLE_CLIENT_ID!.trim(),
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!.trim(),
       allowDangerousEmailAccountLinking: true,
+      authorization: {
+        params: {
+          prompt: "select_account",
+          access_type: "online",
+          response_type: "code",
+        },
+      },
     }),
   ];
-}
-
-/** Lazy Prisma + MongoDB SaaS user upsert on Google login. */
-async function upsertGoogleUser(params: {
-  email: string;
-  name?: string | null;
-  image?: string | null;
-}) {
-  if (isBuildPhase()) return;
-
-  const { default: prisma } = await import("@/lib/prisma");
-  const { upsertSaasUserOnAuth } = await import("@/lib/saas-user");
-  const email = params.email.toLowerCase().trim();
-
-  await prisma.user.upsert({
-    where: { email },
-    create: {
-      email,
-      name: params.name ?? email.split("@")[0],
-      image: params.image ?? null,
-      emailVerified: new Date(),
-      provider: "google",
-      plan: "free",
-      cvLimit: 3,
-      cvUsed: 0,
-    },
-    update: {
-      name: params.name ?? undefined,
-      image: params.image ?? undefined,
-      emailVerified: new Date(),
-      provider: "google",
-    },
-  });
-
-  await upsertSaasUserOnAuth({ email, name: params.name });
 }
 
 async function notifyGoogleLogin(email: string) {
@@ -77,7 +50,8 @@ async function notifyGoogleLogin(email: string) {
  * Uses JWT sessions (not PrismaAdapter) so:
  * - Vercel builds never open a DB connection during page-data collection
  * - Serverless deploys work without SQLite file persistence
- * - Google users are still persisted via upsertGoogleUser() in signIn callback
+ * - Google users are persisted via ensureGoogleUser() in signIn callback
+ * - JWT app cookies are issued via /api/auth/sync-session after OAuth redirect
  */
 export function getAuthOptions(): NextAuthOptions {
   if (cachedOptions) return cachedOptions;
@@ -88,7 +62,6 @@ export function getAuthOptions(): NextAuthOptions {
       signIn: "/login",
       error: "/login",
     },
-    // JWT strategy — no PrismaAdapter (build-safe + Vercel-compatible)
     session: {
       strategy: "jwt",
       maxAge: 7 * 24 * 60 * 60,
@@ -106,21 +79,53 @@ export function getAuthOptions(): NextAuthOptions {
         if (account?.provider !== "google" || !user.email) return true;
 
         try {
-          await upsertGoogleUser({
-            email: user.email,
-            name: user.name,
-            image: user.image,
-          });
+          await ensureGoogleUser(
+            {
+              email: user.email,
+              name: user.name,
+              image: user.image,
+            },
+            account.providerAccountId
+              ? {
+                  providerAccountId: account.providerAccountId,
+                  access_token: account.access_token,
+                  refresh_token: account.refresh_token,
+                  expires_at: account.expires_at,
+                  token_type: account.token_type,
+                  scope: account.scope,
+                  id_token: account.id_token,
+                }
+              : null
+          );
         } catch (err) {
           console.error("[nextauth] Google user upsert failed", err);
         }
         return true;
       },
       async redirect({ url, baseUrl }) {
-        const resolvedBase = baseUrl || getNextAuthUrl();
-        if (url.startsWith(resolvedBase)) return url;
-        if (url.startsWith("/")) return `${resolvedBase}${url}`;
-        return `${resolvedBase}/dashboard`;
+        const resolvedBase = (baseUrl || getNextAuthUrl()).replace(/\/$/, "");
+
+        // Preserve OAuth error redirects to login
+        if (url.includes("error=")) {
+          if (url.startsWith("/")) return `${resolvedBase}${url}`;
+          return url;
+        }
+
+        // Skip re-sync if already routed through bridge
+        if (url.includes("/api/auth/sync-session")) {
+          return url;
+        }
+
+        let nextPath = "/dashboard";
+        if (url.startsWith(resolvedBase)) {
+          nextPath = url.slice(resolvedBase.length) || "/dashboard";
+        } else if (url.startsWith("/")) {
+          nextPath = url;
+        }
+
+        const sync = new URL("/api/auth/sync-session", resolvedBase);
+        sync.searchParams.set("next", nextPath);
+        return sync.toString();
       },
       async jwt({ token, user, account }) {
         if (user?.email) {
@@ -138,7 +143,7 @@ export function getAuthOptions(): NextAuthOptions {
           if (token.email) session.user.email = String(token.email);
           if (token.name) session.user.name = String(token.name);
           if (token.picture) session.user.image = String(token.picture);
-          (session.user as { id?: string }).id = token.sub;
+          session.user.id = token.sub;
         }
         return session;
       },

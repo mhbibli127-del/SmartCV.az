@@ -308,6 +308,15 @@ const REQUIRED_FOR_PROD = [
 
 const OPTIONAL_BUT_RECOMMENDED = [
   { name: "OPENAI_API_KEY", read: getOpenAIKey },
+  { name: "NEXTAUTH_SECRET", read: () => readSecret("NEXTAUTH_SECRET") },
+  {
+    name: "GOOGLE_CLIENT_ID",
+    read: () =>
+      process.env.GOOGLE_CLIENT_ID?.trim() &&
+      process.env.GOOGLE_CLIENT_SECRET?.trim()
+        ? process.env.GOOGLE_CLIENT_ID.trim()
+        : null,
+  },
   {
     name: "CLOUDINARY_CLOUD_NAME",
     read: () => (isCloudinaryConfigured() ? getCloudinaryCloudName() : null),

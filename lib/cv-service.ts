@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import Cv from "@/models/Cv";
 import type { CVContent, CVDocument, CVListItem } from "@/types/cv-document";
 import { defaultContent, titleFromContent } from "@/lib/cv-normalizer";
-import { connectMongoose } from "@/lib/mongoose-connect";
+import { connectDB } from "@/lib/mongodb";
 
 function toDocument(doc: InstanceType<typeof Cv>): CVDocument {
   const raw = doc.toObject();
@@ -22,7 +22,7 @@ function toDocument(doc: InstanceType<typeof Cv>): CVDocument {
 }
 
 async function ensureDb() {
-  await connectMongoose();
+  await connectDB();
 }
 
 export async function listUserCVs(email: string): Promise<CVListItem[]> {

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { connectDB } from "@/lib/mongodb";
+import { connectDB, getMongoConnectionState, pingDatabase } from "@/lib/mongodb";
 import { maskMongoUri, requireMongoUri } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +11,14 @@ export async function GET() {
     console.log("[mongo-test] URI validated:", maskMongoUri(uri));
 
     await connectDB();
+    const ping = await pingDatabase();
+    const state = getMongoConnectionState();
 
     return NextResponse.json({
       ok: true,
-      db: uri.split("/").pop()?.split("?")[0] ?? "unknown",
+      db: state.name ?? uri.split("/").pop()?.split("?")[0] ?? "unknown",
+      latencyMs: ping.latencyMs,
+      readyState: state.readyState,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Connection failed";

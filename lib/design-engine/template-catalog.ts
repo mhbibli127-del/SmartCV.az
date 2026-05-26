@@ -1,4 +1,5 @@
 import type { TemplateFilters, TemplateMetadata } from "@/types/design-system";
+import { getCoreTemplateBySlug } from "@/lib/design-engine/core-templates";
 import { DESIGN_THEMES } from "./themes";
 
 /** Extensible template catalog — scales to DB/API; seeded with premium presets + variants */
@@ -143,5 +144,5 @@ export function filterTemplates(filters: TemplateFilters): TemplateMetadata[] {
 }
 
 export function getTemplateBySlug(slug: string): TemplateMetadata | undefined {
-  return TEMPLATE_CATALOG.find((t) => t.slug === slug);
+  return getCoreTemplateBySlug(slug) ?? TEMPLATE_CATALOG.find((t) => t.slug === slug);
 }

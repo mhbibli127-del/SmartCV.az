@@ -56,6 +56,8 @@ function LoginForm() {
     }
   }, [searchParams, toast]);
 
+  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -186,7 +188,7 @@ function LoginForm() {
 
             <OrDivider />
 
-            <GoogleSignInButton callbackUrl="/dashboard" />
+            <GoogleSignInButton callbackUrl={callbackUrl} />
 
             <p className="text-sm text-gray-500 mt-6 text-center">
               Don&apos;t have an account?{" "}

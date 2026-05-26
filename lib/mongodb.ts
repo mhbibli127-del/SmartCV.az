@@ -1,10 +1,17 @@
 import mongoose from "mongoose";
+import type { Db } from "mongodb";
 import { maskMongoUri, requireMongoUri } from "@/lib/env";
 
 /**
- * Vercel serverless-safe Mongoose connection cache.
- * Reuses a single connection across warm lambda invocations.
+ * Production MongoDB connection for Next.js App Router + Vercel serverless.
+ *
+ * - Single global cached connection (conn + promise)
+ * - Deduplicates concurrent connect attempts
+ * - Reconnects after stale/disconnected state
+ * - bufferCommands: true — safe query buffering until connected
+ * - Guarantees DB handle before returning from getDatabase()
  */
+
 interface MongooseCache {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
@@ -24,78 +31,172 @@ if (!global.__mongooseCache) {
   global.__mongooseCache = cached;
 }
 
-/**
- * Connect to MongoDB using MONGODB_URI from environment.
- * - Validates URI before connecting
- * - Reuses existing connection when already connected
- * - Deduplicates concurrent connect attempts
- */
-export async function connectDB(): Promise<typeof mongoose> {
+const CONNECT_OPTIONS: mongoose.ConnectOptions = {
+  /** Buffer queries until connection is ready — prevents "findOne before connect" crashes */
+  bufferCommands: true,
+  maxPoolSize: 10,
+  minPoolSize: 0,
+  serverSelectionTimeoutMS: 15_000,
+  socketTimeoutMS: 45_000,
+  connectTimeoutMS: 15_000,
+  heartbeatFrequencyMS: 10_000,
+  retryWrites: true,
+  retryReads: true,
+};
+
+function isDev(): boolean {
+  return process.env.NODE_ENV === "development";
+}
+
+function log(message: string, meta?: Record<string, unknown>): void {
+  if (!isDev()) return;
+  // eslint-disable-next-line no-console
+  console.log(`[mongodb] ${message}`, meta ?? "");
+}
+
+function isConnected(): boolean {
+  return mongoose.connection.readyState === 1 && Boolean(mongoose.connection.db);
+}
+
+function resetCache(): void {
+  cached.conn = null;
+  cached.promise = null;
+}
+
+async function createConnection(): Promise<typeof mongoose> {
   const uri = requireMongoUri();
   const safeUri = maskMongoUri(uri);
 
-  if (cached.conn && mongoose.connection.readyState === 1) {
+  log("Connecting...", { uri: safeUri });
+
+  mongoose.set("strictQuery", true);
+
+  try {
+    const instance = await mongoose.connect(uri, CONNECT_OPTIONS);
+
+    if (!mongoose.connection.db) {
+      await waitForDbHandle(5_000);
+    }
+
+    cached.conn = instance;
+
+    log("Connected", {
+      host: mongoose.connection.host,
+      db: mongoose.connection.name,
+    });
+
+    mongoose.connection.on("disconnected", () => {
+      log("Disconnected — cache cleared for next request");
+      resetCache();
+    });
+
+    mongoose.connection.on("error", (err) => {
+      // eslint-disable-next-line no-console
+      console.error("[mongodb] Connection error:", err.message);
+      resetCache();
+    });
+
+    return instance;
+  } catch (err) {
+    resetCache();
+    const message = err instanceof Error ? err.message : String(err);
     // eslint-disable-next-line no-console
-    console.log("[mongodb] Reusing existing connection", {
+    console.error("[mongodb] Connection failed", { uri: safeUri, error: message });
+    throw err;
+  }
+}
+
+/** Wait until mongoose.connection.db is available */
+function waitForDbHandle(timeoutMs: number): Promise<void> {
+  if (mongoose.connection.db) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
+
+    const tryResolve = () => {
+      if (mongoose.connection.db) {
+        resolve();
+        return true;
+      }
+      if (Date.now() >= deadline) {
+        reject(new Error("[mongodb] Database handle unavailable after connect"));
+        return true;
+      }
+      return false;
+    };
+
+    if (tryResolve()) return;
+
+    const interval = setInterval(() => {
+      if (tryResolve()) clearInterval(interval);
+    }, 50);
+
+    mongoose.connection.once("connected", () => {
+      if (tryResolve()) clearInterval(interval);
+    });
+
+    mongoose.connection.once("error", (err) => {
+      clearInterval(interval);
+      reject(err);
+    });
+  });
+}
+
+/**
+ * Connect to MongoDB Atlas — cached, idempotent, serverless-safe.
+ * Always await this before Mongoose queries or getDatabase().
+ */
+export async function connectDB(): Promise<typeof mongoose> {
+  if (isConnected() && cached.conn) {
+    log("Reusing connection", {
       host: mongoose.connection.host,
       db: mongoose.connection.name,
     });
     return cached.conn;
   }
 
-  if (cached.promise) {
-    // eslint-disable-next-line no-console
-    console.log("[mongodb] Awaiting in-flight connection...");
+  const state = mongoose.connection.readyState;
+
+  // Stale or closed — start fresh
+  if (state === 0 || state === 3) {
+    resetCache();
+  }
+
+  // Another invocation is connecting — wait for it
+  if (state === 2 && cached.promise) {
+    log("Awaiting in-flight connection...");
     return cached.promise;
   }
 
-  // eslint-disable-next-line no-console
-  console.log("[mongodb] Connecting...", { uri: safeUri });
+  if (!cached.promise) {
+    cached.promise = createConnection();
+  }
 
-  cached.promise = (async () => {
-    try {
-      mongoose.set("strictQuery", true);
-
-      const connection = await mongoose.connect(uri, {
-        bufferCommands: false,
-        maxPoolSize: 10,
-        serverSelectionTimeoutMS: 10_000,
-        socketTimeoutMS: 45_000,
-      });
-
-      cached.conn = connection;
-
-      // eslint-disable-next-line no-console
-      console.log("[mongodb] Connected successfully", {
-        host: mongoose.connection.host,
-        db: mongoose.connection.name,
-        uri: safeUri,
-      });
-
-      return connection;
-    } catch (err) {
-      cached.promise = null;
-      cached.conn = null;
-
-      const message = err instanceof Error ? err.message : String(err);
-      // eslint-disable-next-line no-console
-      console.error("[mongodb] Connection failed", {
-        uri: safeUri,
-        error: message,
-      });
-
-      throw err;
-    }
-  })();
-
-  return cached.promise;
+  try {
+    const conn = await cached.promise;
+    return conn;
+  } catch (err) {
+    resetCache();
+    throw err;
+  }
 }
 
+/** Backward-compatible alias used by cv-service and legacy imports */
+export const connectMongoose = connectDB;
+
 /**
- * Returns the native MongoDB Db handle (used by lib/models.ts, lib/notifications.ts).
+ * Native MongoDB Db handle for direct driver operations (lib/models.ts, etc.)
  */
-export async function getDatabase() {
+export async function getDatabase(): Promise<Db> {
   await connectDB();
+
+  if (mongoose.connection.db) {
+    return mongoose.connection.db;
+  }
+
+  await waitForDbHandle(5_000);
 
   const db = mongoose.connection.db;
   if (!db) {
@@ -104,3 +205,27 @@ export async function getDatabase() {
 
   return db;
 }
+
+/** Health-check helper */
+export async function pingDatabase(): Promise<{ ok: boolean; latencyMs: number }> {
+  const start = Date.now();
+  const db = await getDatabase();
+  await db.command({ ping: 1 });
+  return { ok: true, latencyMs: Date.now() - start };
+}
+
+export function getMongoConnectionState(): {
+  readyState: number;
+  connected: boolean;
+  host?: string;
+  name?: string;
+} {
+  return {
+    readyState: mongoose.connection.readyState,
+    connected: isConnected(),
+    host: mongoose.connection.host,
+    name: mongoose.connection.name,
+  };
+}
+
+export default connectDB;

@@ -15,7 +15,7 @@ const ACTIONS = [
     icon: Sparkles,
     label: "Templates",
     description: "Pick a design",
-    href: "/dashboard/studio",
+    href: "/dashboard/templates",
   },
   {
     icon: Library,

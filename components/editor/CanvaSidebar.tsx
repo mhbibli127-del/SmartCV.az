@@ -183,7 +183,7 @@ function CanvaSidebarInner({ cvId }: { cvId?: string | null }) {
           {sidebarTab === "design" && (
             <div className="space-y-4">
               <Link
-                href="/dashboard/studio"
+                href="/dashboard/templates"
                 className="block rounded-xl border border-black/[0.08] bg-zinc-50 px-3 py-2 text-center text-xs font-medium text-zinc-700 hover:bg-zinc-100"
               >
                 Browse all templates →

@@ -27,7 +27,8 @@ import {
   X,
 
   TrendingUp,
-  Sparkles,
+  LayoutGrid,
+  PenLine,
 } from "lucide-react";
 
 import NotificationPanel from "@/components/NotificationPanel";
@@ -63,7 +64,8 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { name: "My CVs", href: "/dashboard/builder", icon: FileEdit },
-  { name: "Templates", href: "/dashboard/studio", icon: Sparkles },
+  { name: "Templates", href: "/dashboard/templates", icon: LayoutGrid },
+  { name: "Studio", href: "/dashboard/studio", icon: PenLine },
   { name: "Examples", href: "/dashboard/examples", icon: Library },
   { name: "Analytics", href: "/dashboard/analytics", icon: TrendingUp },
   { name: "Account", href: "/dashboard/account", icon: UserCircle },
@@ -78,6 +80,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const isFocusMode =
     pathname.startsWith("/dashboard/studio") ||
     pathname.startsWith("/dashboard/builder/editor");
+
+  const isEditorFocus = isFocusMode;
 
   const isFullWidthStudio = isFocusMode;
 
@@ -211,7 +215,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           "fixed z-40 flex h-screen w-[260px] flex-col border-r border-black/[0.06] bg-white/80 backdrop-blur-xl transition-transform duration-300 md:sticky md:translate-x-0",
 
-          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+          isEditorFocus && "hidden",
+
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
 
         )}
 
@@ -235,8 +241,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 : item.href === "/dashboard/builder"
                   ? pathname === "/dashboard/builder" ||
                     pathname.startsWith("/dashboard/builder/editor")
-                  : pathname === item.href ||
-                    (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
+                  : item.href === "/dashboard/studio"
+                    ? pathname === "/dashboard/studio" ||
+                      pathname.startsWith("/dashboard/studio")
+                    : item.href === "/dashboard/templates"
+                      ? pathname === "/dashboard/templates"
+                      : pathname === item.href ||
+                        (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
 
             return (
 
@@ -416,10 +427,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <main
           data-full-width={isFullWidthStudio || undefined}
-          className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-6 py-8 md:px-8 data-[full-width=true]:max-w-none"
+          className={cn(
+            "mx-auto w-full flex-1 space-y-6 px-6 py-8 md:px-8 data-[full-width=true]:max-w-none",
+            isFullWidthStudio ? "max-w-none space-y-0 py-0" : "max-w-6xl"
+          )}
         >
-
-          <UsageBanner />
+          {!isFullWidthStudio && <UsageBanner />}
 
           {children}
 
