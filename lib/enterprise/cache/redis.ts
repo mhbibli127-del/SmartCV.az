@@ -139,3 +139,15 @@ export async function cacheGetOrSet<T>(
   await cache.set(key, value, ttlSeconds);
   return value;
 }
+
+export async function cacheSet(
+  key: string,
+  value: unknown,
+  ttlSeconds?: number
+): Promise<void> {
+  await getCache().set(key, value, ttlSeconds);
+}
+
+export async function cacheDelete(key: string): Promise<void> {
+  await getCache().del(key);
+}

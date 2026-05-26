@@ -13,10 +13,12 @@ export async function GET(req: NextRequest) {
     }
 
     let bio = "";
+    let avatar: string | null = null;
     try {
       const db = await import("@/lib/mongodb").then((m) => m.getDatabase());
       const profile = await db.collection("profiles").findOne({ userId: user.email });
       bio = (profile as { bio?: string } | null)?.bio ?? "";
+      avatar = (profile as { avatar?: string } | null)?.avatar ?? null;
     } catch {
       /* optional */
     }
@@ -25,6 +27,7 @@ export async function GET(req: NextRequest) {
       name: user.name,
       email: user.email,
       bio,
+      avatar,
     });
   } catch (error) {
     console.error("Error fetching profile:", error);
@@ -39,7 +42,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, email, phone, bio } = await req.json();
+    const { name, email, phone, bio, avatar } = await req.json();
     const cleanEmail = user.email.toLowerCase().trim();
 
     if (name) {
@@ -59,6 +62,7 @@ export async function PUT(req: NextRequest) {
         userEmail: cleanEmail,
         name: name || user.name || undefined,
         bio: typeof bio === "string" ? bio.slice(0, 500) : undefined,
+        avatar: typeof avatar === "string" ? avatar.slice(0, 2048) : undefined,
         preferences: {
           theme: "light",
           language: "en",
@@ -78,7 +82,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Profile updated successfully",
-      profile: { name, email: email || user.email, phone, bio },
+      profile: { name, email: email || user.email, phone, bio, avatar },
     });
   } catch (error) {
     console.error("Error updating profile:", error);

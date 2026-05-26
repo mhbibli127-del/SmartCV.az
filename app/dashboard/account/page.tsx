@@ -52,7 +52,7 @@ function AccountPageContent() {
   const searchParams = useSearchParams();
   const { success, error: toastError } = useToast();
   const { refreshSubscription } = useSubscription();
-  const { trackPageView } = useAnalytics();
+  const { trackPageView, trackSubscriptionUpgrade } = useAnalytics();
   const [activeSection, setActiveSection] = useState<AccountSectionId>("profile");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -76,23 +76,33 @@ function AccountPageContent() {
     const sessionId = searchParams.get("session_id");
     if (checkout === "success" && sessionId) {
       refreshSubscription().then(() => {
+        trackSubscriptionUpgrade({
+          fromPlan: "free",
+          toPlan: "paid",
+          provider: "paddle",
+          page: "/dashboard/account",
+        });
         success(
           "Payment successful",
           "Your subscription is active. It may take a few seconds to sync."
         );
       });
     }
-  }, [searchParams, refreshSubscription, success]);
+  }, [searchParams, refreshSubscription, success, trackSubscriptionUpgrade]);
 
   useEffect(() => {
     const loadUser = async () => {
       const { ok, data } = await api.get<{ email?: string; name?: string }>("/api/auth/me");
       let bio = "";
+      let avatarUrl = buildAvatarUrl("user@example.com");
       try {
         const profileRes = await fetch("/api/user/profile", { credentials: "include" });
         if (profileRes.ok) {
           const profileData = await profileRes.json();
           bio = profileData.bio ?? "";
+          if (profileData.avatar) {
+            avatarUrl = profileData.avatar;
+          }
         }
       } catch {
         /* optional */
@@ -104,7 +114,7 @@ function AccountPageContent() {
           name,
           email,
           bio,
-          avatarUrl: buildAvatarUrl(email),
+          avatarUrl: avatarUrl === buildAvatarUrl("user@example.com") ? buildAvatarUrl(email) : avatarUrl,
         };
         setProfile(next);
         setSavedProfile(next);
@@ -129,7 +139,10 @@ function AccountPageContent() {
       ...prev,
       email,
       name: prev.name === "User" ? formattedName : prev.name,
-      avatarUrl: buildAvatarUrl(email),
+      avatarUrl:
+        prev.avatarUrl.includes("res.cloudinary.com") || prev.avatarUrl.startsWith("blob:")
+          ? prev.avatarUrl
+          : buildAvatarUrl(email),
     }));
     setNotifications(loadStoredPrefs("smartcv_notifications", DEFAULT_NOTIFICATIONS));
     setAiPrefs(loadStoredPrefs("smartcv_ai_prefs", DEFAULT_AI_PREFS));
@@ -142,7 +155,12 @@ function AccountPageContent() {
         method: "PUT",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: profile.name, email: profile.email, bio: profile.bio }),
+        body: JSON.stringify({
+          name: profile.name,
+          email: profile.email,
+          bio: profile.bio,
+          avatar: profile.avatarUrl,
+        }),
       });
       if (response.ok) {
         setSavedProfile(profile);

@@ -87,6 +87,8 @@ export function titleFromContent(content: CVContent): string {
 
 /** Build persisted CV content from API/builder payloads */
 export function buildContentFromPayload(cvData: Record<string, unknown>): CVContent {
+  const designTheme = cvData.designTheme as CVContent["designTheme"];
+
   if (cvData.mode === "visual" && cvData.canvas) {
     return {
       mode: "visual",
@@ -97,6 +99,7 @@ export function buildContentFromPayload(cvData: Record<string, unknown>): CVCont
       generatorData: cvData.generatorData as Record<string, unknown> | undefined,
       templateId: cvData.templateId as number | undefined,
       templateName: cvData.templateName as string | undefined,
+      designTheme,
       metadata: (cvData.metadata as CVContent["metadata"]) ?? { version: 1 },
     };
   }

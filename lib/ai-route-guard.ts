@@ -27,7 +27,21 @@ export async function requireAiAccess(req: NextRequest) {
   return user.email;
 }
 
-export async function recordAiUsage(email: string, action = "ai_generate") {
+export async function recordAiUsage(
+  email: string,
+  action = "ai_generate",
+  meta?: {
+    feature?: string;
+    model?: string;
+    success?: boolean;
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    estimatedCostUsd?: number;
+    durationMs?: number;
+    errorCode?: string;
+  }
+) {
   await incrementAiUsed(email).catch((err) => {
     console.error("[ai-route] incrementAiUsed failed:", err);
   });
@@ -39,9 +53,28 @@ export async function recordAiUsage(email: string, action = "ai_generate") {
       action,
       page: "/dashboard/generator",
       timestamp: new Date(),
+      metadata: meta ?? {},
     });
   } catch {
     /* optional analytics store */
+  }
+
+  try {
+    const { captureAIUsageServer } = await import("@/lib/analytics/server");
+    captureAIUsageServer(email, {
+      feature: meta?.feature ?? "ai",
+      action,
+      success: meta?.success ?? true,
+      model: meta?.model,
+      promptTokens: meta?.promptTokens,
+      completionTokens: meta?.completionTokens,
+      totalTokens: meta?.totalTokens,
+      estimatedCostUsd: meta?.estimatedCostUsd,
+      durationMs: meta?.durationMs,
+      errorCode: meta?.errorCode,
+    });
+  } catch {
+    /* posthog optional */
   }
 }
 

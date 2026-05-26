@@ -41,6 +41,83 @@ export function getAppUrl(): string {
   return process.env.NEXT_PUBLIC_APP_URL?.trim() || "http://localhost:3000";
 }
 
+export function getCloudinaryCloudName(): string | null {
+  return readSecret("CLOUDINARY_CLOUD_NAME");
+}
+
+export function getCloudinaryApiKey(): string | null {
+  return readSecret("CLOUDINARY_API_KEY");
+}
+
+export function getCloudinaryApiSecret(): string | null {
+  return readSecret("CLOUDINARY_API_SECRET");
+}
+
+/** Safe for client-side CDN URL building — no secrets exposed. */
+export function getPublicCloudinaryCloudName(): string | null {
+  return (
+    process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?.trim() ||
+    getCloudinaryCloudName()
+  );
+}
+
+export function isCloudinaryConfigured(): boolean {
+  return Boolean(
+    getCloudinaryCloudName() &&
+      getCloudinaryApiKey() &&
+      getCloudinaryApiSecret()
+  );
+}
+
+export function getPostHogKey(): string | null {
+  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
+  if (!key || isPlaceholder(key)) return null;
+  return key;
+}
+
+export function isPostHogConfigured(): boolean {
+  return Boolean(getPostHogKey());
+}
+
+export function getLeonardoApiKey(): string | null {
+  return readSecret("LEONARDO_API_KEY");
+}
+
+export function getLeonardoModelId(): string | null {
+  return readSecret("LEONARDO_MODEL_ID");
+}
+
+export function isLeonardoConfigured(): boolean {
+  return Boolean(getLeonardoApiKey());
+}
+
+export function getPineconeApiKey(): string | null {
+  return readSecret("PINECONE_API_KEY");
+}
+
+export function getPineconeIndex(): string | null {
+  const index = process.env.PINECONE_INDEX?.trim();
+  return index && !isPlaceholder(index) ? index : null;
+}
+
+export function isPineconeConfigured(): boolean {
+  return Boolean(getPineconeApiKey() && getPineconeIndex());
+}
+
+export function getLiveblocksSecretKey(): string | null {
+  return readSecret("LIVEBLOCKS_SECRET_KEY");
+}
+
+export function getLiveblocksPublicKey(): string | null {
+  const key = process.env.NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_KEY?.trim();
+  if (!key || isPlaceholder(key)) return null;
+  return key;
+}
+
+export function isLiveblocksConfigured(): boolean {
+  return Boolean(getLiveblocksSecretKey() && getLiveblocksPublicKey());
+}
+
 export function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value || isPlaceholder(value)) {
@@ -231,6 +308,20 @@ const REQUIRED_FOR_PROD = [
 
 const OPTIONAL_BUT_RECOMMENDED = [
   { name: "OPENAI_API_KEY", read: getOpenAIKey },
+  {
+    name: "CLOUDINARY_CLOUD_NAME",
+    read: () => (isCloudinaryConfigured() ? getCloudinaryCloudName() : null),
+  },
+  {
+    name: "NEXT_PUBLIC_POSTHOG_KEY",
+    read: getPostHogKey,
+  },
+  { name: "PINECONE_API_KEY", read: () => (isPineconeConfigured() ? getPineconeApiKey() : null) },
+  { name: "LEONARDO_API_KEY", read: getLeonardoApiKey },
+  {
+    name: "LIVEBLOCKS_SECRET_KEY",
+    read: () => (isLiveblocksConfigured() ? getLiveblocksSecretKey() : null),
+  },
 ];
 
 let bannerPrinted = false;

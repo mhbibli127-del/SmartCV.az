@@ -25,14 +25,14 @@ export default function BuilderHeader({
   onOpenVisual,
 }: BuilderHeaderProps) {
   const { isDirty, isSaving, lastSaved } = useBuilder();
-  const { trackButtonClick } = useAnalytics();
+  const { trackButtonClick, trackResumeExported } = useAnalytics();
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-medium uppercase tracking-widest text-zinc-400">Form builder</p>
-          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">CV Builder</h1>
+          <p className="text-xs font-medium uppercase tracking-widest text-zinc-400">My CVs</p>
+          <h1 className="text-xl font-semibold tracking-tight text-zinc-900">Content & layout</h1>
           {lastSaved && (
             <p className="mt-0.5 text-xs text-zinc-400">
               Last saved {lastSaved.toLocaleTimeString()}
@@ -74,6 +74,7 @@ export default function BuilderHeader({
             size="sm"
             onClick={async () => {
               await trackButtonClick("Export PDF", "export-cv", "/dashboard/builder");
+              trackResumeExported({ format: "pdf", cvId: cvId ?? undefined });
               await onExport();
             }}
           >

@@ -105,6 +105,12 @@ export function isWithinBounds(el: EditorElement): boolean {
 }
 
 export const GRID_SIZE = 8;
+export const SNAP_THRESHOLD = 6;
+
+export interface AlignmentGuide {
+  orientation: "horizontal" | "vertical";
+  position: number;
+}
 
 export function snapToGrid(value: number, grid = GRID_SIZE): number {
   return Math.round(value / grid) * grid;
@@ -115,5 +121,77 @@ export function snapElementToGrid(el: EditorElement, grid = GRID_SIZE): EditorEl
     ...el,
     x: snapToGrid(el.x, grid),
     y: snapToGrid(el.y, grid),
+    width: snapToGrid(el.width, grid),
+    height: snapToGrid(el.height, grid),
   });
+}
+
+/** Snap position with alignment to other elements and page guides */
+export function computeAlignmentSnap(
+  elements: EditorElement[],
+  activeId: string,
+  box: Pick<EditorElement, "x" | "y" | "width" | "height">,
+  threshold = SNAP_THRESHOLD
+): { x: number; y: number; guides: AlignmentGuide[] } {
+  const others = elements.filter((e) => e.id !== activeId);
+  let { x, y, width, height } = box;
+  const guides: AlignmentGuide[] = [];
+
+  const vLines = [x, x + width / 2, x + width];
+  const hLines = [y, y + height / 2, y + height];
+
+  const vTargets = [
+    CANVAS_PADDING,
+    A4_WIDTH / 2,
+    A4_WIDTH - CANVAS_PADDING,
+    ...others.flatMap((e) => [e.x, e.x + e.width / 2, e.x + e.width]),
+  ];
+  const hTargets = [
+    CANVAS_PADDING,
+    A4_HEIGHT / 2,
+    A4_HEIGHT - CANVAS_PADDING,
+    ...others.flatMap((e) => [e.y, e.y + e.height / 2, e.y + e.height]),
+  ];
+
+  let bestDx = threshold + 1;
+  let snapDx = 0;
+  let guideX: number | null = null;
+
+  for (const line of vLines) {
+    for (const target of vTargets) {
+      const delta = Math.abs(line - target);
+      if (delta <= threshold && delta < bestDx) {
+        bestDx = delta;
+        snapDx = target - line;
+        guideX = target;
+      }
+    }
+  }
+
+  if (guideX != null) {
+    x += snapDx;
+    guides.push({ orientation: "vertical", position: guideX });
+  }
+
+  let bestDy = threshold + 1;
+  let snapDy = 0;
+  let guideY: number | null = null;
+
+  for (const line of hLines) {
+    for (const target of hTargets) {
+      const delta = Math.abs(line - target);
+      if (delta <= threshold && delta < bestDy) {
+        bestDy = delta;
+        snapDy = target - line;
+        guideY = target;
+      }
+    }
+  }
+
+  if (guideY != null) {
+    y += snapDy;
+    guides.push({ orientation: "horizontal", position: guideY });
+  }
+
+  return { x, y, guides };
 }

@@ -43,18 +43,12 @@ export async function vectorSearch<T extends { id: string; embedding?: number[] 
   candidates: T[],
   limit = 10
 ): Promise<Array<T & { similarity: number }>> {
-  const queryEmbedding = await createEmbeddingCached(queryText);
-
-  const scored = candidates
-    .filter((c) => c.embedding && c.embedding.length === EMBEDDING_DIM)
-    .map((c) => ({
-      ...c,
-      similarity: cosineSimilarity(queryEmbedding, c.embedding!),
-    }))
-    .sort((a, b) => b.similarity - a.similarity)
-    .slice(0, limit);
-
-  return scored;
+  const { semanticSearch } = await import("@/lib/enterprise/ai/vector-store");
+  const results = await semanticSearch(queryText, candidates, limit);
+  return results.map(({ similarity, ...rest }) => ({
+    ...(rest as T),
+    similarity,
+  }));
 }
 
 export { EMBEDDING_MODEL, EMBEDDING_DIM };

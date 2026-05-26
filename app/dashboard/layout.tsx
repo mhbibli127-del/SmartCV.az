@@ -14,8 +14,6 @@ import {
 
   FileEdit,
 
-  Wand2,
-
   Library,
 
   UserCircle,
@@ -29,7 +27,7 @@ import {
   X,
 
   TrendingUp,
-  Palette,
+  Sparkles,
 } from "lucide-react";
 
 import NotificationPanel from "@/components/NotificationPanel";
@@ -63,20 +61,12 @@ import { cn } from "@/lib/utils";
 
 
 const navItems = [
-
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-
-  { name: "CV Builder", href: "/dashboard/builder", icon: FileEdit },
-  { name: "Visual Editor", href: "/dashboard/builder/editor", icon: Palette },
-
-  { name: "AI Generator", href: "/dashboard/generator", icon: Wand2 },
-
+  { name: "My CVs", href: "/dashboard/builder", icon: FileEdit },
+  { name: "Templates", href: "/dashboard/studio", icon: Sparkles },
   { name: "Examples", href: "/dashboard/examples", icon: Library },
-
   { name: "Analytics", href: "/dashboard/analytics", icon: TrendingUp },
-
   { name: "Account", href: "/dashboard/account", icon: UserCircle },
-
 ];
 
 
@@ -84,6 +74,12 @@ const navItems = [
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   const pathname = usePathname();
+
+  const isFocusMode =
+    pathname.startsWith("/dashboard/studio") ||
+    pathname.startsWith("/dashboard/builder/editor");
+
+  const isFullWidthStudio = isFocusMode;
 
   const router = useRouter();
 
@@ -234,10 +230,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {navItems.map((item) => {
 
             const isActive =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`)) ||
-              (item.href === "/dashboard/builder" &&
-                pathname.startsWith("/dashboard/builder"));
+              item.href === "/dashboard"
+                ? pathname === "/dashboard"
+                : item.href === "/dashboard/builder"
+                  ? pathname === "/dashboard/builder" ||
+                    pathname.startsWith("/dashboard/builder/editor")
+                  : pathname === item.href ||
+                    (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
 
             return (
 
@@ -359,6 +358,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="flex min-w-0 flex-1 flex-col">
 
+        {!isFocusMode && (
         <header className="sticky top-0 z-30 flex h-[72px] items-center justify-between border-b border-black/[0.06] bg-white/70 px-6 backdrop-blur-xl md:px-8">
 
           <form onSubmit={handleSearch} className="relative max-w-md flex-1">
@@ -410,10 +410,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
         </header>
+        )}
 
 
 
-        <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-6 py-8 md:px-8">
+        <main
+          data-full-width={isFullWidthStudio || undefined}
+          className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-6 py-8 md:px-8 data-[full-width=true]:max-w-none"
+        >
 
           <UsageBanner />
 

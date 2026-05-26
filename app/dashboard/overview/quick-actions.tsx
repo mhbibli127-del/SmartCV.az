@@ -1,27 +1,21 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FileEdit, Wand2, Library, TrendingUp, ArrowUpRight, LayoutTemplate } from "lucide-react";
+import { FileEdit, Sparkles, Library, TrendingUp, ArrowUpRight } from "lucide-react";
 import { Surface } from "@/components/ui/page-shell";
 
 const ACTIONS = [
   {
     icon: FileEdit,
-    label: "Create CV",
-    description: "Start from scratch",
+    label: "My CVs",
+    description: "Create or edit",
     href: "/dashboard/builder",
   },
   {
-    icon: Wand2,
-    label: "AI Generator",
-    description: "Generate with AI",
-    href: "/dashboard/generator",
-  },
-  {
-    icon: LayoutTemplate,
-    label: "Visual Editor",
-    description: "Canva-style canvas",
-    href: "/dashboard/builder/editor",
+    icon: Sparkles,
+    label: "Templates",
+    description: "Pick a design",
+    href: "/dashboard/studio",
   },
   {
     icon: Library,
@@ -32,7 +26,7 @@ const ACTIONS = [
   {
     icon: TrendingUp,
     label: "Analytics",
-    description: "Track progress",
+    description: "ATS & activity",
     href: "/dashboard/analytics",
   },
 ];
@@ -43,7 +37,7 @@ export default function QuickActions() {
   return (
     <Surface padding>
       <h3 className="text-sm font-semibold text-zinc-900">Quick actions</h3>
-      <p className="mt-0.5 text-xs text-zinc-500">Jump to a workflow</p>
+      <p className="mt-0.5 text-xs text-zinc-500">Start where you left off</p>
       <div className="mt-4 grid grid-cols-2 gap-2">
         {ACTIONS.map((action) => {
           const Icon = action.icon;
@@ -52,7 +46,7 @@ export default function QuickActions() {
               key={action.label}
               type="button"
               onClick={() => router.push(action.href)}
-              className="group flex flex-col items-start rounded-[12px] border border-black/[0.06] bg-zinc-50/50 p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-black/[0.1] hover:bg-white hover:shadow-sm"
+              className="group flex flex-col items-start rounded-[12px] border border-black/[0.06] bg-zinc-50/50 p-3.5 text-left transition-all duration-200 hover:border-black/[0.1] hover:bg-white hover:shadow-sm"
             >
               <div className="flex w-full items-center justify-between">
                 <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-white shadow-sm ring-1 ring-black/[0.06]">

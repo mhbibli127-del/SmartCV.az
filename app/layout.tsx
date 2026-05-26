@@ -2,9 +2,8 @@ import "./globals.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Toaster } from "@/components/ui/toaster";
-import AuthProvider from "@/components/providers/AuthProvider";
-import { SubscriptionProvider } from "@/components/providers/SubscriptionProvider";
 import UpgradeModal from "@/components/UpgradeModal";
+import { AppProviders } from "@/app/providers";
 import { inter } from "@/lib/fonts";
 
 export const metadata: Metadata = {
@@ -20,13 +19,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="az" className={inter.variable}>
       <body className={inter.className}>
-        <AuthProvider>
-          <SubscriptionProvider>
-            {children}
-            <UpgradeModal />
-            <Toaster />
-          </SubscriptionProvider>
-        </AuthProvider>
+        <AppProviders>
+          {children}
+          <UpgradeModal />
+          <Toaster />
+        </AppProviders>
       </body>
     </html>
   );

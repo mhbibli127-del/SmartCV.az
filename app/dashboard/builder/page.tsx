@@ -10,7 +10,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import BuilderHeader from "@/components/builder/BuilderHeader";
 import BuilderSidebar from "@/components/builder/BuilderSidebar";
 import BuilderCanvas from "@/components/builder/BuilderCanvas";
-import AIAssistPanel from "@/components/editor/AIAssistPanel";
+import { AICopilot } from "@/components/design/AICopilot";
 import { logger } from "@/lib/logger";
 import { LoadingState } from "@/components/ui/states";
 import {
@@ -18,7 +18,6 @@ import {
   readExampleImport,
   exampleContentToSections,
 } from "@/lib/cv-hydration";
-import { applyAiResultToSections } from "@/lib/apply-ai-to-sections";
 
 function BuilderContent() {
   const params = useSearchParams();
@@ -197,20 +196,6 @@ function BuilderContent() {
     }
   };
 
-  const handleAiApply = (updated: unknown) => {
-    const data = updated as Record<string, unknown>;
-    if (data.sections && Array.isArray(data.sections)) {
-      setCvData({ ...cvData, sections: data.sections as typeof cvData.sections });
-      refreshSubscription();
-      return;
-    }
-    setCvData({
-      ...cvData,
-      sections: applyAiResultToSections(cvData.sections, data),
-    });
-    refreshSubscription();
-  };
-
   if (loading) {
     return <LoadingState label="Loading CV Builder…" />;
   }
@@ -230,9 +215,9 @@ function BuilderContent() {
         <BuilderSidebar />
         <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-hidden">
           <BuilderCanvas />
-          <AIAssistPanel cvData={cvData} onApply={handleAiApply} />
         </div>
       </div>
+      <AICopilot />
     </div>
   );
 }

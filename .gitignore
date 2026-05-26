@@ -10,3 +10,6 @@ build
 .turbo
 dist
 .cache
+
+# Sentry Config File
+.env.sentry-build-plugin

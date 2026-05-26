@@ -1,12 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Toolbar } from "@/components/editor/Toolbar";
-import { Sidebar } from "@/components/editor/Sidebar";
+import { CanvaSidebar } from "@/components/editor/CanvaSidebar";
 import { getCanvasStateFromStore, useEditorStore } from "@/lib/editor-store";
 import { useToast } from "@/components/ui/use-toast";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -14,8 +14,20 @@ import { PageShell, PageHeader } from "@/components/ui/page-shell";
 import { Button } from "@/components/ui/button";
 import { createDefaultCanvas } from "@/lib/layout-engine";
 import { hydrateCvData, sectionsToCanvasElements, canvasToSections } from "@/lib/cv-hydration";
-import AIAssistPanel from "@/components/editor/AIAssistPanel";
+import { AICopilot } from "@/components/design/AICopilot";
+import { getTemplateBySlug } from "@/lib/design-engine/template-catalog";
+import { useDesignStore } from "@/lib/design-store";
+import { designSnapshot, restoreDesignFromContent } from "@/lib/design-persistence";
 import { useAnalytics } from "@/lib/analytics";
+import { useCollabSession } from "@/hooks/useCollabSession";
+import { useCurrentUser, displayNameOf } from "@/hooks/useCurrentUser";
+import { CollabBar } from "@/components/realtime/CollabBar";
+import { FloatingToolbar } from "@/components/editor/FloatingToolbar";
+import { EditorRulers } from "@/components/editor/EditorRulers";
+import { LiveblocksRoom } from "@/components/realtime/LiveblocksRoom";
+import { SkeletonEditor } from "@/components/ui/skeleton";
+import { canUseCollab, canExportPng } from "@/lib/plan-features";
+import type { CanvasEditorHandle } from "@/components/editor/CanvasEditor";
 
 const CanvasEditor = dynamic(
   () => import("@/components/editor/CanvasEditor").then((m) => m.CanvasEditor),
@@ -34,15 +46,27 @@ function VisualEditorContent() {
   const router = useRouter();
   const params = useSearchParams();
   const cvId = params.get("id");
+  const templateSlug = params.get("template");
   const { success, error: toastError } = useToast();
-  const { canUseAI, openUpgradeModal, refreshSubscription } = useSubscription();
+  const { openUpgradeModal, plan } = useSubscription();
   const loadElements = useEditorStore((s) => s.loadElements);
   const elements = useEditorStore((s) => s.elements);
   const markSaved = useEditorStore((s) => s.markSaved);
+  const setTemplate = useDesignStore((s) => s.setTemplate);
+  const hydrateDesign = useDesignStore((s) => s.hydrateDesign);
+  const activeTheme = useDesignStore((s) => s.activeTheme);
+  const selectedTemplate = useDesignStore((s) => s.selectedTemplate);
+  const refreshLiveScores = useDesignStore((s) => s.refreshLiveScores);
+  const { user } = useCurrentUser();
+  const canvasRef = useRef<CanvasEditorHandle>(null);
+  const { presence, connected } = useCollabSession(
+    cvId,
+    user?.email ?? null,
+    user ? displayNameOf(user) : undefined
+  );
   const { trackPageView } = useAnalytics();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [aiLoading, setAiLoading] = useState(false);
   const [title, setTitle] = useState("Untitled CV");
 
   useEffect(() => {
@@ -75,6 +99,8 @@ function VisualEditorContent() {
         } else {
           loadElements(createDefaultCanvas().elements);
         }
+        const restored = restoreDesignFromContent(content);
+        if (restored) hydrateDesign(restored);
         setTitle(data.cv?.title ?? "Untitled CV");
       } catch {
         toastError("Load failed", "Could not load this CV.");
@@ -84,7 +110,17 @@ function VisualEditorContent() {
       }
     };
     load();
-  }, [cvId, loadElements, toastError]);
+  }, [cvId, loadElements, toastError, hydrateDesign]);
+
+  useEffect(() => {
+    if (!templateSlug || loading) return;
+    const template = getTemplateBySlug(templateSlug);
+    if (template) setTemplate(template);
+  }, [templateSlug, loading, setTemplate]);
+
+  useEffect(() => {
+    refreshLiveScores();
+  }, [elements.length, refreshLiveScores]);
 
   const persist = useCallback(async () => {
     const canvas = getCanvasStateFromStore();
@@ -96,7 +132,8 @@ function VisualEditorContent() {
         mode: "visual",
         canvas,
         sections,
-        metadata: { version: 1 },
+        designTheme: designSnapshot(activeTheme, selectedTemplate),
+        metadata: { version: 2 },
       },
       status: "draft",
     };
@@ -117,7 +154,7 @@ function VisualEditorContent() {
       router.replace(`/dashboard/builder/editor?id=${data.cvId}`);
     }
     return data;
-  }, [cvId, title, markSaved, router, openUpgradeModal]);
+  }, [cvId, title, markSaved, router, openUpgradeModal, activeTheme, selectedTemplate]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -129,6 +166,23 @@ function VisualEditorContent() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleExportPng = () => {
+    if (!canExportPng(plan)) {
+      openUpgradeModal();
+      return;
+    }
+    const dataUrl = canvasRef.current?.exportPng();
+    if (!dataUrl) {
+      toastError("Export failed", "Canvas not ready.");
+      return;
+    }
+    const a = document.createElement("a");
+    a.href = dataUrl;
+    a.download = `${title.replace(/\s+/g, "_")}.png`;
+    a.click();
+    success("Exported", "PNG downloaded.");
   };
 
   const handleExport = async () => {
@@ -162,89 +216,10 @@ function VisualEditorContent() {
     }
   };
 
-  const handleAiApply = (updated: unknown) => {
-    const data = updated as Record<string, unknown>;
-    const improved = String(data.summary ?? data.optimizedSummary ?? "").trim();
-    if (!improved) return;
-
-    const state = useEditorStore.getState();
-    const next = state.elements.map((el) => {
-      if (el.type === "section" && el.sectionType === "summary") {
-        return { ...el, content: improved };
-      }
-      if (el.id === "section-summary") return { ...el, content: improved };
-      return el;
-    });
-    loadElements(next);
-    refreshSubscription();
-    success("AI updated", "Content applied to canvas.");
-  };
-
-  const cvDataForAi = {
-    mode: "visual" as const,
-    canvas: { elements },
-    summary: elements
-      .filter((e) => e.text || e.content)
-      .map((e) => e.text ?? e.content)
-      .join("\n"),
-  };
-
-  const handleAiRewrite = async () => {
-    if (!canUseAI()) {
-      openUpgradeModal();
-      return;
-    }
-    setAiLoading(true);
-    try {
-      const state = useEditorStore.getState();
-      const canvas = getCanvasStateFromStore();
-      const textBlocks = canvas.elements
-        .filter((e) => e.text || e.content)
-        .map((e) => e.text ?? e.content)
-        .join("\n");
-
-      const res = await fetch("/api/cv/enhance", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          cv: { summary: textBlocks, mode: "visual" },
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        if (data.code === "AI_LIMIT_REACHED") openUpgradeModal();
-        throw new Error(data.error || "AI failed");
-      }
-
-      const improved = String(data.summary ?? data.name ?? textBlocks).slice(0, 500);
-      const targetId =
-        state.selectedId ??
-        canvas.elements.find((e) => e.id === "heading-title")?.id ??
-        canvas.elements.find((e) => e.type === "text")?.id;
-
-      const next = state.elements.map((el) => {
-        if (el.id === targetId) {
-          return { ...el, text: improved };
-        }
-        if (el.type === "section" && el.sectionType === "summary") {
-          return { ...el, content: improved };
-        }
-        return el;
-      });
-      loadElements(next);
-      await refreshSubscription();
-      success("AI updated", "Content improved.");
-    } catch (e) {
-      toastError("AI failed", e instanceof Error ? e.message : "Try again.");
-    } finally {
-      setAiLoading(false);
-    }
-  };
-
-  if (loading) return <EditorLoading />;
+  if (loading) return <SkeletonEditor />;
 
   return (
+    <LiveblocksRoom cvId={cvId}>
     <PageShell className="space-y-4">
       <PageHeader
         eyebrow="Visual editor"
@@ -263,19 +238,24 @@ function VisualEditorContent() {
       <Toolbar
         onSave={handleSave}
         onExport={handleExport}
+        onExportPng={handleExportPng}
         saving={saving}
-        onAiRewrite={handleAiRewrite}
-        aiLoading={aiLoading}
       />
 
+      <CollabBar presence={presence} connected={connected} enabled={Boolean(cvId) && canUseCollab(plan)} />
+
       <div className="flex min-h-[calc(100vh-280px)] gap-4">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <CanvasEditor />
-          <AIAssistPanel cvData={cvDataForAi} onApply={handleAiApply} />
+        <CanvaSidebar cvId={cvId} />
+        <div className="relative flex min-w-0 flex-1 flex-col gap-4">
+          <EditorRulers width={794} height={1123} />
+          <FloatingToolbar />
+          <CanvasEditor ref={canvasRef} />
         </div>
       </div>
+
+      <AICopilot />
     </PageShell>
+    </LiveblocksRoom>
   );
 }
 

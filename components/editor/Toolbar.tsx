@@ -9,8 +9,10 @@ import {
   Trash2,
   ArrowUp,
   ArrowDown,
-  Sparkles,
   Grid3X3,
+  Copy,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEditorStore } from "@/lib/editor-store";
@@ -18,12 +20,11 @@ import { useEditorStore } from "@/lib/editor-store";
 type Props = {
   onSave: () => void;
   onExport: () => void;
+  onExportPng?: () => void;
   saving?: boolean;
-  onAiRewrite?: () => void;
-  aiLoading?: boolean;
 };
 
-function ToolbarInner({ onSave, onExport, saving, onAiRewrite, aiLoading }: Props) {
+function ToolbarInner({ onSave, onExport, onExportPng, saving }: Props) {
   const addTextElement = useEditorStore((s) => s.addTextElement);
   const addSectionBlock = useEditorStore((s) => s.addSectionBlock);
   const selectedId = useEditorStore((s) => s.selectedId);
@@ -37,6 +38,10 @@ function ToolbarInner({ onSave, onExport, saving, onAiRewrite, aiLoading }: Prop
   const isDirty = useEditorStore((s) => s.isDirty);
   const snapEnabled = useEditorStore((s) => s.snapEnabled);
   const toggleSnap = useEditorStore((s) => s.toggleSnap);
+  const duplicateElement = useEditorStore((s) => s.duplicateElement);
+  const toggleElementLock = useEditorStore((s) => s.toggleElementLock);
+  const elements = useEditorStore((s) => s.elements);
+  const selected = elements.find((e) => e.id === selectedId);
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-[14px] border border-black/[0.08] bg-white px-4 py-3 shadow-sm">
@@ -64,6 +69,17 @@ function ToolbarInner({ onSave, onExport, saving, onAiRewrite, aiLoading }: Prop
           <Button variant="ghost" size="icon" onClick={() => sendBackward(selectedId)}>
             <ArrowDown className="h-4 w-4" />
           </Button>
+          <Button variant="ghost" size="icon" onClick={() => duplicateElement(selectedId)} title="Duplicate">
+            <Copy className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => toggleElementLock(selectedId)}
+            title={selected?.locked ? "Unlock" : "Lock"}
+          >
+            {selected?.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+          </Button>
           <Button variant="ghost" size="icon" onClick={() => removeElement(selectedId)}>
             <Trash2 className="h-4 w-4 text-red-500" />
           </Button>
@@ -78,18 +94,17 @@ function ToolbarInner({ onSave, onExport, saving, onAiRewrite, aiLoading }: Prop
         <Grid3X3 className="h-4 w-4" />
       </Button>
       <div className="flex-1" />
-      {onAiRewrite && (
-        <Button variant="outline" size="sm" onClick={onAiRewrite} disabled={aiLoading}>
-          <Sparkles className="h-3.5 w-3.5" />
-          {aiLoading ? "AI…" : "AI Rewrite"}
-        </Button>
-      )}
       <Button variant="outline" size="sm" onClick={onSave} disabled={saving || !isDirty}>
         {saving ? "Saving…" : "Save"}
       </Button>
       <Button size="sm" onClick={onExport}>
         Export PDF
       </Button>
+      {onExportPng && (
+        <Button variant="outline" size="sm" onClick={onExportPng}>
+          PNG
+        </Button>
+      )}
     </div>
   );
 }

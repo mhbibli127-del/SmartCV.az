@@ -18,7 +18,7 @@ export interface CVSection {
 
 export interface EditorElement {
   id: string;
-  type: "text" | "section";
+  type: "text" | "section" | "shape" | "image" | "divider";
   x: number;
   y: number;
   width: number;
@@ -31,6 +31,15 @@ export interface EditorElement {
   fontWeight?: "normal" | "bold";
   sectionType?: CVSectionType;
   content?: string;
+  locked?: boolean;
+  /** shape */
+  shapeType?: "rect" | "circle" | "line";
+  cornerRadius?: number;
+  stroke?: string;
+  strokeWidth?: number;
+  opacity?: number;
+  /** image */
+  src?: string;
 }
 
 export interface EditorCanvasState {
@@ -40,6 +49,8 @@ export interface EditorCanvasState {
   background?: string;
 }
 
+import type { DesignTheme } from "@/types/design-system";
+
 export interface CVContent {
   mode: "form" | "visual";
   sections?: CVSection[];
@@ -47,6 +58,12 @@ export interface CVContent {
   templateId?: number;
   templateName?: string;
   generatorData?: Record<string, unknown>;
+  designTheme?: {
+    themeId: string;
+    theme: DesignTheme;
+    templateSlug?: string;
+    templateId?: string;
+  };
   metadata?: {
     version: number;
     createdAt?: string;

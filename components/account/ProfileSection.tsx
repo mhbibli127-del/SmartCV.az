@@ -1,10 +1,12 @@
 "use client";
 
 import { useRef } from "react";
-import { Camera } from "lucide-react";
+import { Camera, Loader2 } from "lucide-react";
 import type { UserProfile } from "./types";
 import SettingsCard from "./ui/SettingsCard";
 import SettingsButton from "./ui/SettingsButton";
+import { useMediaUpload } from "@/hooks/useMediaUpload";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ProfileSectionProps {
   profile: UserProfile;
@@ -22,11 +24,20 @@ export default function ProfileSection({
   saving = false,
 }: ProfileSectionProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { error: toastError } = useToast();
+  const { upload, isUploading } = useMediaUpload({
+    context: "avatar",
+    onSuccess: (media) => {
+      onChange({ ...profile, avatarUrl: media.optimizedUrl || media.secureUrl });
+    },
+    onError: (message) => toastError("Upload failed", message),
+  });
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    onChange({ ...profile, avatarUrl: URL.createObjectURL(file) });
+    await upload(file);
+    e.target.value = "";
   };
 
   return (
@@ -35,10 +46,10 @@ export default function ProfileSection({
       description="Update your photo and personal details."
       footer={
         <>
-          <SettingsButton variant="secondary" disabled={saving} onClick={onCancel}>
+          <SettingsButton variant="secondary" disabled={saving || isUploading} onClick={onCancel}>
             Cancel
           </SettingsButton>
-          <SettingsButton onClick={onSave} disabled={saving}>
+          <SettingsButton onClick={onSave} disabled={saving || isUploading}>
             {saving ? "Saving…" : "Save changes"}
           </SettingsButton>
         </>
@@ -50,25 +61,42 @@ export default function ProfileSection({
             <img src={profile.avatarUrl} alt="Profile" className="h-full w-full object-cover" />
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-lg bg-white text-gray-700 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50"
+              onClick={() => !isUploading && fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="absolute bottom-1 right-1 flex h-8 w-8 items-center justify-center rounded-lg bg-white text-gray-700 shadow-sm ring-1 ring-gray-200 transition hover:bg-gray-50 disabled:opacity-60"
               aria-label="Upload profile picture"
             >
-              <Camera size={14} />
+              {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
             </button>
-            <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              disabled={isUploading}
+              onChange={(e) => void handleAvatarChange(e)}
+            />
           </div>
           <div>
             <p className="text-sm font-medium text-gray-900">Profile photo</p>
-            <p className="mt-1 text-sm text-gray-500">JPG, PNG or GIF. Max 2MB recommended.</p>
-            <SettingsButton variant="secondary" className="mt-3" onClick={() => fileInputRef.current?.click()}>
-              Upload new photo
+            <p className="mt-1 text-sm text-gray-500">
+              JPG, PNG, WebP or GIF. Max 2MB. Stored on Cloudinary CDN.
+            </p>
+            <SettingsButton
+              variant="secondary"
+              className="mt-3"
+              disabled={isUploading}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              {isUploading ? "Uploading…" : "Upload new photo"}
             </SettingsButton>
           </div>
         </div>
         <div className="grid gap-6">
           <div className="space-y-2">
-            <label htmlFor="profile-name" className="text-sm font-medium text-gray-900">Full name</label>
+            <label htmlFor="profile-name" className="text-sm font-medium text-gray-900">
+              Full name
+            </label>
             <input
               id="profile-name"
               type="text"
@@ -78,7 +106,9 @@ export default function ProfileSection({
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="profile-email" className="text-sm font-medium text-gray-900">Email address</label>
+            <label htmlFor="profile-email" className="text-sm font-medium text-gray-900">
+              Email address
+            </label>
             <input
               id="profile-email"
               type="email"
@@ -88,7 +118,9 @@ export default function ProfileSection({
             />
           </div>
           <div className="space-y-2">
-            <label htmlFor="profile-bio" className="text-sm font-medium text-gray-900">Bio</label>
+            <label htmlFor="profile-bio" className="text-sm font-medium text-gray-900">
+              Bio
+            </label>
             <textarea
               id="profile-bio"
               rows={4}
