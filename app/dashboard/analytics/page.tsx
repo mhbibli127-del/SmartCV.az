@@ -17,7 +17,6 @@ import {
 import { Eye, Download, FileText, Sparkles, Activity } from "lucide-react";
 import { ErrorState, LoadingState } from "@/components/ui/states";
 import { PageShell, PageHeader, StatCard, Surface } from "@/components/ui/page-shell";
-import { useAnalytics } from "@/lib/analytics";
 
 const COLORS = ["#18181b", "#52525b", "#71717a", "#a1a1aa", "#d4d4d8"];
 
@@ -34,7 +33,6 @@ interface AnalyticsData {
 }
 
 export default function AnalyticsPage() {
-  const { trackPageView } = useAnalytics();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,10 +51,6 @@ export default function AnalyticsPage() {
       setLoading(false);
     }
   }, [range]);
-
-  useEffect(() => {
-    trackPageView("/dashboard/analytics");
-  }, [trackPageView]);
 
   useEffect(() => {
     fetchAnalytics();

@@ -8,6 +8,8 @@ import {
   parseDateRange,
   type DateRangeKey,
 } from "@/lib/analytics-service";
+import { isMongoCircuitOpen } from "@/lib/db-circuit";
+import { isMongoConfigured } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +56,10 @@ export async function POST(req: NextRequest) {
     const { eventType, data } = await req.json();
     if (!eventType) {
       return NextResponse.json({ error: "Missing event type" }, { status: 400 });
+    }
+
+    if (!isMongoConfigured() || isMongoCircuitOpen()) {
+      return NextResponse.json({ success: true, skipped: "mongo_unavailable" });
     }
 
     await DatabaseOperations.trackInteraction({

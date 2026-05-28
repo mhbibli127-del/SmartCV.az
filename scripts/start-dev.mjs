@@ -1,10 +1,20 @@
+import path from "path";
 import { spawn } from "child_process";
+import { projectRoot } from "./load-env.mjs";
 
-const child = spawn("npx", ["next", "dev"], {
+const nextBin = path.join(projectRoot, "node_modules", "next", "dist", "bin", "next");
+
+const devEnv = {
+  ...process.env,
+  NODE_ENV: "development",
+  AUTH_TRUST_HOST: "true",
+};
+
+const child = spawn(process.execPath, [nextBin, "dev"], {
   stdio: ["inherit", "pipe", "pipe"],
-  shell: true,
+  cwd: projectRoot,
+  env: devEnv,
 });
-
 let opened = false;
 
 function openBrowser(url) {

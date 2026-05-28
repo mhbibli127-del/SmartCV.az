@@ -4,7 +4,6 @@ export type AccountSectionId =
   | "profile"
   | "security"
   | "notifications"
-  | "billing"
   | "ai"
   | "privacy";
 

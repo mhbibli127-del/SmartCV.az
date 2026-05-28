@@ -1,221 +1,188 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Filter, ChevronLeft, ChevronRight } from "lucide-react";
-import { EmptyState, ErrorState, LoadingState } from "@/components/ui/states";
-import ExampleProfileCard from "@/components/examples/ExampleProfileCard";
-import ExamplePreviewModal from "@/components/examples/ExamplePreviewModal";
-import type { CVExampleProfile } from "@/lib/cv-examples/types";
-import { PageShell, PageHeader, StatCard, Surface } from "@/components/ui/page-shell";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Search, Plus, Sparkles } from "lucide-react";
+import { EmptyState, LoadingState } from "@/components/ui/states";
+import { PageShell, PageHeader, Surface } from "@/components/ui/page-shell";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { PublishedResumeCard } from "@/components/examples/PublishedResumeCard";
+import { PublishedResumePreviewModal } from "@/components/examples/PublishedResumePreviewModal";
+import type { PublishedResumeItem, ResumeContent } from "@/types/resume";
 import { cn } from "@/lib/utils";
-import { useAnalytics } from "@/lib/analytics";
 
 const PAGE_SIZE = 24;
 
 export default function ExamplesPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { trackPageView, trackSearch, trackTemplateSelect } = useAnalytics();
-  const [examples, setExamples] = useState<CVExampleProfile[]>([]);
+  const [resumes, setResumes] = useState<PublishedResumeItem[]>([]);
   const [categories, setCategories] = useState<string[]>(["All"]);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState(searchParams.get("q") ?? "");
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [catalogTotal, setCatalogTotal] = useState(0);
-  const [preview, setPreview] = useState<CVExampleProfile | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  const [preview, setPreview] = useState<
+    (PublishedResumeItem & { content?: ResumeContent }) | null
+  >(null);
 
   useEffect(() => {
-    trackPageView("/dashboard/examples");
-  }, [trackPageView]);
-
-  useEffect(() => {
-    const q = searchParams.get("q");
-    if (q !== null && q !== searchQuery) {
-      setSearchQuery(q);
-      setDebouncedQuery(q);
-    }
-  }, [searchParams]);
-
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-      if (searchQuery.trim()) trackSearch(searchQuery.trim(), catalogTotal);
-    }, 280);
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 280);
     return () => clearTimeout(t);
-  }, [searchQuery, catalogTotal, trackSearch]);
+  }, [searchQuery]);
 
-  useEffect(() => {
-    setPage(1);
-  }, [selectedCategory, debouncedQuery]);
-
-  const fetchExamples = useCallback(async () => {
+  const fetchPublished = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: String(PAGE_SIZE),
-      });
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
       if (selectedCategory !== "All") params.set("category", selectedCategory);
       if (debouncedQuery) params.set("q", debouncedQuery);
 
       const res = await fetch(`/api/examples?${params}`);
       const data = await res.json();
-      setExamples(Array.isArray(data.examples) ? data.examples : []);
-      setCatalogTotal(data.catalogTotal ?? data.total ?? 0);
-      setTotalPages(data.totalPages ?? 1);
+      setResumes(Array.isArray(data.resumes) ? data.resumes : []);
       if (Array.isArray(data.categories)) setCategories(data.categories);
     } catch {
-      setExamples([]);
-      setError("We couldn't load examples right now. Your filters are saved — try again.");
+      setResumes([]);
     } finally {
       setLoading(false);
     }
-  }, [page, selectedCategory, debouncedQuery]);
+  }, [selectedCategory, debouncedQuery]);
 
   useEffect(() => {
-    fetchExamples();
-  }, [fetchExamples, reloadKey]);
+    void fetchPublished();
+  }, [fetchPublished]);
 
-  const handleUseExample = (example: CVExampleProfile) => {
-    trackTemplateSelect(parseInt(example.id.replace(/\D/g, ""), 10) || 0, example.name, example.category);
-    sessionStorage.setItem(
-      "smartcv_import_example",
-      JSON.stringify({ cvContent: example.cvContent, template: example.template, name: example.name })
-    );
-    router.push(`/dashboard/builder?example=${example.slug}&template=${example.template}`);
+  useEffect(() => {
+    const onFocus = () => void fetchPublished();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [fetchPublished]);
+
+  const handlePreview = async (item: PublishedResumeItem) => {
+    try {
+      const res = await fetch(`/api/examples/${item.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setPreview(data.resume ?? item);
+      } else {
+        setPreview(item);
+      }
+    } catch {
+      setPreview(item);
+    }
   };
+
+  const showEmpty = !loading && resumes.length === 0 && !debouncedQuery && selectedCategory === "All";
 
   return (
     <PageShell>
       <PageHeader
-        eyebrow="Design gallery"
-        title="Professional CV examples"
-        description={`Browse ${catalogTotal > 0 ? catalogTotal.toLocaleString() : "88"}+ realistic profiles — ATS-optimized and ready to customize.`}
+        eyebrow="Community gallery"
+        title="Published resumes"
+        description="Real resumes shared by SmartCV users after PDF export from Studio."
+        action={
+          <Link
+            href="/dashboard/studio"
+            className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+          >
+            <Sparkles className="h-4 w-4" />
+            Open Studio
+          </Link>
+        }
       />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="Profiles" value={catalogTotal.toLocaleString()} />
-        <StatCard label="Categories" value={String(Math.max(0, categories.length - 1))} />
-        <StatCard label="On this page" value={String(examples.length)} />
-        <StatCard
-          label="Filter"
-          value={debouncedQuery ? "Search" : "All"}
-          hint={debouncedQuery ? `"${debouncedQuery.slice(0, 20)}${debouncedQuery.length > 20 ? "…" : ""}"` : undefined}
-        />
-      </div>
-
-      <Surface padding>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative w-full lg:max-w-md">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-            <Input
-              type="search"
-              placeholder="Search by name, role, skill, location…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-            {loading && debouncedQuery && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-zinc-400">
-                Searching…
-              </span>
-            )}
+      {!showEmpty && (
+        <Surface padding>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="relative w-full lg:max-w-md">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
+              <Input
+                type="search"
+                placeholder="Search by template name…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat)}
+                  className={cn(
+                    "rounded-full px-3.5 py-1.5 text-xs font-medium transition",
+                    selectedCategory === cat
+                      ? "bg-zinc-900 text-white"
+                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <Filter className="h-4 w-4 shrink-0 text-zinc-400" />
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={cn(
-                  "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-all duration-200",
-                  selectedCategory === cat
-                    ? "bg-zinc-900 text-white shadow-sm"
-                    : "bg-zinc-50 text-zinc-600 ring-1 ring-black/[0.06] hover:bg-zinc-100"
-                )}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
-        </div>
-      </Surface>
+        </Surface>
+      )}
 
-      {loading && examples.length === 0 ? (
-        <LoadingState label="Loading professional examples…" />
-      ) : error ? (
-        <ErrorState description={error} onRetry={() => setReloadKey((k) => k + 1)} />
-      ) : examples.length === 0 ? (
+      {loading ? (
+        <LoadingState label="Loading community resumes…" />
+      ) : showEmpty ? (
         <EmptyState
-          title="No profiles match your search"
-          description="Try a different keyword or category — our database has examples across every major role."
+          title="No resumes published yet"
+          description="Export a PDF from Studio to share your resume in the community gallery."
           action={
-            <Button
-              size="sm"
+            <div className="flex flex-wrap justify-center gap-3">
+              <Link
+                href="/dashboard/studio"
+                className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800"
+              >
+                <Sparkles className="h-4 w-4" />
+                Open Studio
+              </Link>
+              <Link
+                href="/dashboard/templates"
+                className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-5 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
+              >
+                <Plus className="h-4 w-4" />
+                Browse templates
+              </Link>
+            </div>
+          }
+          className="border-zinc-200 bg-white py-16"
+        />
+      ) : resumes.length === 0 ? (
+        <EmptyState
+          title="No matches found"
+          description="Try another template category or search term."
+          action={
+            <button
+              type="button"
               onClick={() => {
                 setSearchQuery("");
                 setSelectedCategory("All");
               }}
+              className="rounded-xl border border-zinc-200 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-50"
             >
               Clear filters
-            </Button>
+            </button>
           }
+          className="border-zinc-200 bg-white py-16"
         />
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {examples.map((ex) => (
-            <ExampleProfileCard
-              key={ex.id}
-              example={ex}
-              onPreview={setPreview}
-              onUse={handleUseExample}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {resumes.map((resume) => (
+            <PublishedResumeCard
+              key={resume.id}
+              resume={resume}
+              onPreview={handlePreview}
             />
           ))}
         </div>
       )}
 
-      {totalPages > 1 && !loading && (
-        <div className="flex items-center justify-center gap-4">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-          >
-            <ChevronLeft className="h-4 w-4" /> Previous
-          </Button>
-          <span className="text-sm tabular-nums text-zinc-500">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
-
-      <ExamplePreviewModal
-        example={preview}
-        onClose={() => setPreview(null)}
-        onUse={(ex) => {
-          setPreview(null);
-          handleUseExample(ex);
-        }}
-      />
+      <PublishedResumePreviewModal resume={preview} onClose={() => setPreview(null)} />
     </PageShell>
   );
 }

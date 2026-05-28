@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bot, X, Send, Loader2, Sparkles } from "lucide-react";
 import { useDesignStore } from "@/lib/design-store";
 import { useEditorStore } from "@/lib/editor-store";
-import { useSubscription } from "@/hooks/useSubscription";
 import { cn } from "@/lib/utils";
 
 function AICopilotInner() {
@@ -16,7 +15,6 @@ function AICopilotInner() {
   const addMessage = useDesignStore((s) => s.addCopilotMessage);
   const setStreaming = useDesignStore((s) => s.setCopilotStreaming);
   const applyThemeToCanvas = useDesignStore((s) => s.applyThemeToCanvas);
-  const { canUseAI, openUpgradeModal } = useSubscription();
   const [input, setInput] = useState("");
   const [streamBuffer, setStreamBuffer] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
@@ -25,10 +23,6 @@ function AICopilotInner() {
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text || streaming) return;
-    if (!canUseAI()) {
-      openUpgradeModal();
-      return;
-    }
 
     addMessage({ role: "user", content: text });
     setInput("");
@@ -56,7 +50,6 @@ function AICopilotInner() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        if (err.code === "AI_LIMIT_REACHED") openUpgradeModal();
         throw new Error(err.error || "Copilot unavailable");
       }
 
@@ -123,8 +116,6 @@ function AICopilotInner() {
   }, [
     input,
     streaming,
-    canUseAI,
-    openUpgradeModal,
     addMessage,
     setStreaming,
     applyThemeToCanvas,

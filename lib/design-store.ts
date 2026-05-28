@@ -25,6 +25,8 @@ interface DesignStore {
   setCopilotStreaming: (v: boolean) => void;
   refreshLiveScores: () => void;
   hydrateDesign: (persisted: { theme: DesignTheme; templateSlug?: string }) => void;
+  atsSafeMode: boolean;
+  toggleAtsSafeMode: () => void;
 }
 
 export const useDesignStore = create<DesignStore>((set, get) => ({
@@ -42,6 +44,7 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     },
   ],
   copilotStreaming: false,
+  atsSafeMode: false,
 
   setTheme: (theme) => {
     set({ activeTheme: theme });
@@ -114,4 +117,6 @@ export const useDesignStore = create<DesignStore>((set, get) => ({
     }
     get().applyThemeToCanvas();
   },
+
+  toggleAtsSafeMode: () => set((s) => ({ atsSafeMode: !s.atsSafeMode })),
 }));

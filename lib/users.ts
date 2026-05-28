@@ -3,6 +3,12 @@ import path from "path";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
+import {
+  isPrismaCircuitOpen,
+  recordPrismaFailure,
+  validatePostgresUrl,
+} from "@/lib/db-circuit";
+import { getDatabaseUrl } from "@/lib/env";
 
 const USERS_DB_PATH = path.join(process.cwd(), "data", "users_db.json");
 
@@ -80,15 +86,24 @@ export type UserRecord = LocalUser | Awaited<ReturnType<typeof prisma.user.findU
 
 let migrationDone = false;
 
-/** One-time sync from data/users_db.json → Prisma SQLite. */
+/** One-time sync from data/users_db.json → Prisma. Runs at most once per process. */
 async function migrateLocalUsersToPrisma() {
   if (migrationDone) return;
   migrationDone = true;
+
+  if (isPrismaCircuitOpen()) return;
+
+  const validation = validatePostgresUrl(getDatabaseUrl());
+  if (!validation.ok) {
+    console.warn("[users] Skipping Prisma migration:", validation.reason);
+    return;
+  }
 
   const localUsers = getLocalUsers();
   if (localUsers.length === 0) return;
 
   for (const u of localUsers) {
+    if (isPrismaCircuitOpen()) break;
     try {
       await prisma.user.upsert({
         where: { email: u.email },
@@ -105,7 +120,8 @@ async function migrateLocalUsersToPrisma() {
         },
       });
     } catch (err) {
-      console.warn("[users] migration skip", u.email, err);
+      recordPrismaFailure(err);
+      break;
     }
   }
 }
@@ -161,8 +177,14 @@ async function ensurePrismaUserFromLocal(cleanEmail: string) {
 }
 
 export async function findUserByEmail(email: string) {
-  await migrateLocalUsersToPrisma();
+  if (!isPrismaCircuitOpen()) {
+    await migrateLocalUsersToPrisma();
+  }
   const cleanEmail = normalizeEmail(email);
+
+  if (isPrismaCircuitOpen()) {
+    return getLocalUsers().find((u) => u.email === cleanEmail) ?? null;
+  }
 
   try {
     const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
@@ -170,6 +192,7 @@ export async function findUserByEmail(email: string) {
     return ensurePrismaUserFromLocal(cleanEmail);
   } catch (err) {
     console.warn("[users] Prisma unavailable, using local JSON", err);
+    recordPrismaFailure(err);
   }
 
   return getLocalUsers().find((u) => u.email === cleanEmail) ?? null;

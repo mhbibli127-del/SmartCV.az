@@ -1,25 +1,59 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
-import { StudioToolsPanel } from "@/components/studio/StudioToolsPanel";
+import { Loader2 } from "lucide-react";
+import { StudioHeader } from "@/components/studio/StudioHeader";
 import { StudioCanvasArea } from "@/components/studio/StudioCanvasArea";
-import { PropertiesInspector } from "@/components/studio/PropertiesInspector";
+import {
+  cvElementsToEditorElements,
+  extractResumeDataFromEditor,
+  getDesignTemplateForSlug,
+  normalizeTemplateSlug,
+} from "@/lib/studio-template-apply";
 import { getCanvasStateFromStore, useEditorStore } from "@/lib/editor-store";
 import { useDesignStore } from "@/lib/design-store";
 import { useToast } from "@/components/ui/use-toast";
-import { useSubscription } from "@/hooks/useSubscription";
 import { createDefaultCanvas } from "@/lib/layout-engine";
 import { hydrateCvData, sectionsToCanvasElements, canvasToSections } from "@/lib/cv-hydration";
-import { getCoreTemplateBySlug } from "@/lib/design-engine/core-templates";
-import { getTemplateBySlug } from "@/lib/design-engine/template-catalog";
+import { getEditorTemplate } from "@/lib/cv-editor/template-catalog";
+import { buildElementsFromTemplate } from "@/lib/cv-editor/template-catalog";
 import { designSnapshot, restoreDesignFromContent } from "@/lib/design-persistence";
-import { useAnalytics } from "@/lib/analytics";
-import { canExportPng } from "@/lib/plan-features";
+import { cn } from "@/lib/utils";
 import { SkeletonEditor } from "@/components/ui/skeleton";
+import { useStudioAutosave } from "@/components/studio/useStudioAutosave";
+import { useStudioExport } from "@/components/studio/useStudioExport";
+import { dispatchResumeGalleryUpdate } from "@/lib/resume-gallery-events";
+import type { StudioExportFormat } from "@/lib/studio-export";
+import {
+  draftMatchesSession,
+  readStudioDraft,
+  writeStudioDraft,
+} from "@/lib/studio-draft";
 import type { CanvasEditorHandle } from "@/components/editor/CanvasEditor";
+import type { CVContent, EditorElement } from "@/types/cv-document";
+import type { ResumeContent } from "@/types/resume";
+
+const StudioToolsPanel = dynamic(
+  () => import("@/components/studio/StudioToolsPanel").then((m) => m.StudioToolsPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="hidden h-full w-[280px] shrink-0 animate-pulse bg-zinc-100 lg:block" />
+    ),
+  }
+);
+
+const PropertiesInspector = dynamic(
+  () => import("@/components/studio/PropertiesInspector").then((m) => m.PropertiesInspector),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="hidden h-full w-[260px] shrink-0 animate-pulse bg-zinc-50 xl:block" />
+    ),
+  }
+);
 
 function StudioEditorContent() {
   const router = useRouter();
@@ -27,105 +61,214 @@ function StudioEditorContent() {
   const cvId = params.get("id");
   const templateSlug = params.get("template");
   const { success, error: toastError } = useToast();
-  const { openUpgradeModal, plan } = useSubscription();
   const loadElements = useEditorStore((s) => s.loadElements);
   const markSaved = useEditorStore((s) => s.markSaved);
   const setTemplate = useDesignStore((s) => s.setTemplate);
   const hydrateDesign = useDesignStore((s) => s.hydrateDesign);
   const activeTheme = useDesignStore((s) => s.activeTheme);
   const selectedTemplate = useDesignStore((s) => s.selectedTemplate);
-  const { trackPageView } = useAnalytics();
+  const applyThemeToCanvas = useDesignStore((s) => s.applyThemeToCanvas);
   const canvasRef = useRef<CanvasEditorHandle>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState("Untitled CV");
+  const [zoom, setZoom] = useState(0.85);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
+  const [mobileRightOpen, setMobileRightOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [canvasReady, setCanvasReady] = useState(false);
+  const elements = useEditorStore((s) => s.elements);
 
-  useEffect(() => {
-    trackPageView("/dashboard/studio");
-  }, [trackPageView]);
+  const { exportDocument } = useStudioExport({
+    canvasRef,
+    title,
+    resumeId: cvId,
+    template: selectedTemplate,
+    templateSlug,
+    canvasReady,
+    onSuccess: (msg, desc) => success(msg, desc),
+    onError: (msg, desc) => toastError(msg, desc),
+  });
+
+  const handleExport = useCallback(
+    async (format: StudioExportFormat) => {
+      setExporting(true);
+      try {
+        await exportDocument(format);
+      } finally {
+        setExporting(false);
+      }
+    },
+    [exportDocument]
+  );
+
+  useStudioAutosave({ resumeId: cvId, title });
 
   useEffect(() => {
     if (templateSlug) {
-      const tpl =
-        getCoreTemplateBySlug(templateSlug) ?? getTemplateBySlug(templateSlug);
-      if (tpl) setTemplate(tpl);
+      const slug = normalizeTemplateSlug(templateSlug);
+      if (!slug) return;
+      const designTpl = getDesignTemplateForSlug(slug);
+      if (designTpl) setTemplate(designTpl);
     }
   }, [templateSlug, setTemplate]);
 
+  const applyTemplateBySlug = useCallback(
+    (slugOrId: string, preserveContent = false) => {
+      const slug = normalizeTemplateSlug(slugOrId) ?? slugOrId;
+      const designTpl = getDesignTemplateForSlug(slug);
+      if (designTpl) setTemplate(designTpl);
+
+      const editorTpl = getEditorTemplate(slug);
+      if (!editorTpl) return;
+
+      const resumeData = preserveContent
+        ? extractResumeDataFromEditor(getCanvasStateFromStore().elements)
+        : undefined;
+      const built = cvElementsToEditorElements(
+        buildElementsFromTemplate(editorTpl, resumeData)
+      );
+
+      if (built.length) {
+        loadElements(built);
+        applyThemeToCanvas();
+      }
+    },
+    [setTemplate, loadElements, applyThemeToCanvas]
+  );
+
+  useEffect(() => {
+    if (loading) {
+      setCanvasReady(false);
+      return;
+    }
+    if (elements.length === 0) {
+      setCanvasReady(false);
+      return;
+    }
+    const t = window.setTimeout(() => setCanvasReady(true), 120);
+    return () => window.clearTimeout(t);
+  }, [loading, elements.length]);
+
+  const hydrateFromContent = useCallback(
+    (content: ResumeContent, resumeTitle?: string) => {
+      const sections = Array.isArray(content.sections) ? content.sections : [];
+      const hydrated = hydrateCvData({
+        sections,
+        generatorData: content.generatorData as Record<string, unknown> | undefined,
+        canvas: content.canvas,
+        mode: content.mode,
+      });
+      const canvas = content.canvas as { elements?: EditorElement[] } | undefined;
+      if (canvas?.elements?.length) {
+        loadElements(canvas.elements);
+      } else if (hydrated.sections?.length) {
+        loadElements(sectionsToCanvasElements(hydrated.sections));
+      } else {
+        loadElements(createDefaultCanvas().elements);
+      }
+      const restored = restoreDesignFromContent(content as CVContent);
+      if (restored) hydrateDesign(restored);
+      if (resumeTitle) setTitle(resumeTitle);
+    },
+    [loadElements, hydrateDesign]
+  );
+
   useEffect(() => {
     const load = async () => {
-      if (!cvId) {
-        loadElements(createDefaultCanvas().elements);
+      if (cvId) {
+        try {
+          const res = await fetch(`/api/resumes/${cvId}`, { credentials: "include" });
+          if (res.ok) {
+            const data = await res.json();
+            const content = (data.resume?.content ?? { mode: "visual" }) as ResumeContent;
+            hydrateFromContent(content, data.resume?.title ?? "Untitled CV");
+            setLoading(false);
+            return;
+          }
+        } catch {
+          /* fall through */
+        }
+      }
+
+      const draft = readStudioDraft();
+      if (draft && draftMatchesSession(draft, cvId)) {
+        if (draft.elements?.length) loadElements(draft.elements);
+        if (draft.designTheme) {
+          hydrateDesign({
+            theme: draft.designTheme,
+            templateSlug: draft.selectedTemplateSlug ?? undefined,
+          });
+        }
+        if (draft.title) setTitle(draft.title);
+        if (draft.pageCount) {
+          useEditorStore.setState({
+            pageCount: draft.pageCount,
+            activePage: 1,
+          });
+        }
         setLoading(false);
         return;
       }
-      try {
-        const res = await fetch(`/api/cv/${cvId}`, { credentials: "include" });
-        if (!res.ok) throw new Error("Failed to load CV");
-        const data = await res.json();
-        const content = data.cv?.content ?? {};
-        const hydrated = hydrateCvData({
-          sections: content.sections,
-          generatorData: content.generatorData,
-          canvas: content.canvas,
-          mode: content.mode,
-        });
-        const canvas = content.canvas;
-        if (canvas?.elements?.length) {
-          loadElements(canvas.elements);
-        } else if (hydrated.sections?.length) {
-          loadElements(sectionsToCanvasElements(hydrated.sections));
-        } else {
-          loadElements(createDefaultCanvas().elements);
-        }
-        const restored = restoreDesignFromContent(content);
-        if (restored) hydrateDesign(restored);
-        setTitle(data.cv?.title ?? "Untitled CV");
-      } catch {
-        toastError("Load failed", "Could not open this CV.");
-        loadElements(createDefaultCanvas().elements);
-      } finally {
+
+      if (templateSlug && !cvId) {
+        applyTemplateBySlug(templateSlug);
         setLoading(false);
+        return;
       }
+
+      loadElements(createDefaultCanvas().elements);
+      setLoading(false);
     };
     void load();
-  }, [cvId, loadElements, hydrateDesign, toastError]);
+  }, [cvId, templateSlug, loadElements, hydrateDesign, hydrateFromContent, applyTemplateBySlug]);
 
   const persist = useCallback(async () => {
     const canvas = getCanvasStateFromStore();
     const sections = canvasToSections(canvas.elements);
     const design = designSnapshot(activeTheme, selectedTemplate);
-    const payload = {
-      title,
-      content: {
-        mode: "visual" as const,
-        canvas,
-        sections,
-        designTheme: design,
-      },
-    };
-
-    const url = cvId ? `/api/cv/${cvId}` : "/api/cv/save";
-    const method = cvId ? "PUT" : "POST";
-    const res = await fetch(url, {
-      method,
+    const tplId = selectedTemplate?.id ?? selectedTemplate?.slug ?? "tpl-minimal-corporate";
+    const res = await fetch("/api/resumes/save", {
+      method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        resumeId: cvId ?? undefined,
+        title,
+        templateId: tplId,
+        templateName: selectedTemplate?.title,
+        content: {
+          mode: "visual" as const,
+          canvas,
+          sections,
+          designTheme: design,
+        },
+      }),
     });
     if (!res.ok) throw new Error("Save failed");
     const data = await res.json();
     markSaved();
-    if (!cvId && data.cvId) {
-      router.replace(`/dashboard/studio?id=${data.cvId}`);
+    if (!cvId && data.resumeId) {
+      router.replace(`/dashboard/studio?id=${data.resumeId}`);
     }
+    dispatchResumeGalleryUpdate({ resumeId: data.resumeId ?? cvId ?? undefined });
     return data;
   }, [cvId, title, markSaved, router, activeTheme, selectedTemplate]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await persist();
+      const data = await persist();
+      writeStudioDraft({
+        title,
+        cvId: cvId ?? data.resumeId ?? null,
+        elements: getCanvasStateFromStore().elements,
+        pageCount: useEditorStore.getState().pageCount,
+        designTheme: activeTheme,
+        selectedTemplateSlug: selectedTemplate?.slug ?? null,
+        updatedAt: Date.now(),
+      });
       success("Saved", "Your resume was saved.");
     } catch {
       toastError("Save failed", "Please try again.");
@@ -134,84 +277,66 @@ function StudioEditorContent() {
     }
   };
 
-  const handleExportPdf = async () => {
-    try {
-      const canvas = getCanvasStateFromStore();
-      const res = await fetch("/api/cv/export", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cvData: { canvas, mode: "visual" }, title }),
-      });
-      if (!res.ok) throw new Error("Export failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${title.replace(/\s+/g, "_")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
-      success("Exported", "PDF downloaded.");
-    } catch {
-      toastError("Export failed", "Could not generate PDF.");
-    }
-  };
-
-  const handleExportPng = () => {
-    if (!canExportPng(plan)) {
-      openUpgradeModal();
-      return;
-    }
-    const dataUrl = canvasRef.current?.exportPng();
-    if (!dataUrl) {
-      toastError("Export failed", "Canvas not ready.");
-      return;
-    }
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = `${title.replace(/\s+/g, "_")}.png`;
-    a.click();
-    success("Exported", "PNG downloaded.");
-  };
+  const handleSelectTemplate = useCallback(
+    (slug: string) => {
+      applyTemplateBySlug(slug, true);
+      setTemplatesOpen(false);
+    },
+    [applyTemplateBySlug]
+  );
 
   if (loading) return <SkeletonEditor />;
 
   return (
     <div className="-mx-6 flex h-[calc(100vh-32px)] flex-col md:-mx-8 md:h-screen">
-      <header className="flex shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-4 py-3 md:px-6">
-        <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard/templates"
-            className="flex items-center gap-1.5 text-sm text-zinc-500 transition hover:text-zinc-900"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Templates
-          </Link>
-          <span className="text-zinc-300">|</span>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="max-w-[200px] truncate bg-transparent text-sm font-semibold text-zinc-900 focus:outline-none md:max-w-xs"
+      <StudioHeader
+        title={title}
+        onTitleChange={setTitle}
+        zoom={zoom}
+        onZoomIn={() => setZoom((z) => Math.min(1.25, z + 0.05))}
+        onZoomOut={() => setZoom((z) => Math.max(0.5, z - 0.05))}
+        onZoomReset={() => setZoom(0.85)}
+        onSave={handleSave}
+        onExport={handleExport}
+        exporting={exporting}
+        exportDisabled={!canvasReady || elements.length === 0}
+        saving={saving}
+        templatesOpen={templatesOpen}
+        onToggleTemplates={() => setTemplatesOpen((v) => !v)}
+        onSelectTemplate={handleSelectTemplate}
+        onToggleLeftPanel={() => setMobileLeftOpen((v) => !v)}
+        onToggleRightPanel={() => setMobileRightOpen((v) => !v)}
+      />
+
+      <div className="relative flex min-h-0 flex-1">
+        <div
+          className={cn(
+            "shrink-0",
+            mobileLeftOpen
+              ? "absolute inset-y-0 left-0 z-20 shadow-xl lg:relative lg:shadow-none"
+              : "hidden lg:block"
+          )}
+        >
+          <StudioToolsPanel
+            cvId={cvId}
+            onSave={handleSave}
+            onExportPdf={() => void handleExport("pdf")}
+            onExportPng={() => void handleExport("png")}
+            onSelectTemplate={handleSelectTemplate}
+            saving={saving}
           />
         </div>
-        <Link
-          href={cvId ? `/dashboard/builder?id=${cvId}&mode=form` : "/dashboard/builder"}
-          className="text-xs text-zinc-500 hover:text-zinc-800"
+        <StudioCanvasArea canvasRef={canvasRef} zoom={zoom} />
+        <div
+          className={cn(
+            "shrink-0",
+            mobileRightOpen
+              ? "absolute inset-y-0 right-0 z-20 shadow-xl xl:relative xl:shadow-none"
+              : "hidden xl:block"
+          )}
         >
-          Form mode
-        </Link>
-      </header>
-
-      <div className="flex min-h-0 flex-1">
-        <StudioToolsPanel
-          cvId={cvId}
-          onSave={handleSave}
-          onExportPdf={handleExportPdf}
-          onExportPng={handleExportPng}
-          saving={saving}
-        />
-        <StudioCanvasArea canvasRef={canvasRef} />
-        <PropertiesInspector />
+          <PropertiesInspector cvId={cvId} />
+        </div>
       </div>
     </div>
   );

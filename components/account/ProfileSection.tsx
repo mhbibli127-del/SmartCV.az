@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import Image from "next/image";
 import { Camera, Loader2 } from "lucide-react";
 import type { UserProfile } from "./types";
 import SettingsCard from "./ui/SettingsCard";
@@ -58,7 +59,14 @@ export default function ProfileSection({
       <div className="space-y-8">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
           <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-gray-200 bg-gray-50">
-            <img src={profile.avatarUrl} alt="Profile" className="h-full w-full object-cover" />
+            <Image
+              src={profile.avatarUrl}
+              alt="Profile"
+              fill
+              sizes="96px"
+              unoptimized
+              className="object-cover"
+            />
             <button
               type="button"
               onClick={() => !isUploading && fileInputRef.current?.click()}

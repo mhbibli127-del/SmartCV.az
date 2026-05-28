@@ -7,9 +7,12 @@ import {
   createDefaultCanvas,
   nextZIndex,
   snapElementToGrid,
+  CANVAS_PADDING,
+  SECTION_GAP,
 } from "@/lib/layout-engine";
+import { getOverflowElements, repositionForPage } from "@/lib/page-overflow";
 
-const MAX_HISTORY = 50;
+const MAX_HISTORY = 30;
 
 export type SidebarTab = "design" | "elements" | "layout" | "layers";
 
@@ -23,8 +26,17 @@ interface EditorStore {
   alignmentGuides: AlignmentGuide[];
   sidebarTab: SidebarTab;
   editingId: string | null;
+  pageCount: number;
+  activePage: number;
+  showRulers: boolean;
+  isExporting: boolean;
 
   loadElements: (elements: EditorElement[]) => void;
+  setExporting: (value: boolean) => void;
+  moveOverflowToNextPage: () => void;
+  setActivePage: (page: number) => void;
+  addPage: () => void;
+  toggleRulers: () => void;
   toggleSnap: () => void;
   selectElement: (id: string | null) => void;
   setSidebarTab: (tab: SidebarTab) => void;
@@ -37,7 +49,7 @@ interface EditorStore {
     bounds: Pick<EditorElement, "x" | "y" | "width" | "height">
   ) => void;
   addTextElement: () => void;
-  addSectionBlock: (sectionType: EditorElement["sectionType"]) => void;
+  addSectionBlock: (sectionType: EditorElement["sectionType"], defaultContent?: string) => void;
   addShapeElement: (shapeType?: EditorElement["shapeType"]) => void;
   addImageElement: (src?: string) => void;
   addDividerElement: () => void;
@@ -45,6 +57,7 @@ interface EditorStore {
   duplicateElement: (id: string) => void;
   toggleElementLock: (id: string) => void;
   removeElement: (id: string) => void;
+  reorderElements: (orderedIds: string[]) => void;
   bringForward: (id: string) => void;
   sendBackward: (id: string) => void;
   undo: () => void;
@@ -87,9 +100,74 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   alignmentGuides: [],
   sidebarTab: "elements",
   editingId: null,
+  pageCount: 1,
+  activePage: 1,
+  showRulers: false,
+  isExporting: false,
 
-  loadElements: (elements) =>
-    set({ elements: autoSpacing(elements), past: [], future: [], isDirty: false, editingId: null }),
+  loadElements: (elements) => {
+    const maxPage = Math.max(1, ...elements.map((e) => e.page ?? 1));
+    set({
+      elements: autoSpacing(elements),
+      past: [],
+      future: [],
+      isDirty: false,
+      editingId: null,
+      pageCount: maxPage,
+      activePage: 1,
+    });
+  },
+
+  setActivePage: (page) =>
+    set((s) => ({
+      activePage: Math.min(Math.max(1, page), s.pageCount),
+      selectedId: null,
+      editingId: null,
+    })),
+
+  addPage: () =>
+    set((s) => ({
+      pageCount: s.pageCount + 1,
+      activePage: s.pageCount + 1,
+      isDirty: true,
+    })),
+
+  toggleRulers: () => set((s) => ({ showRulers: !s.showRulers })),
+
+  setExporting: (value) =>
+    set((s) => ({
+      isExporting: value,
+      ...(value ? { selectedId: null, editingId: null } : {}),
+    })),
+
+  moveOverflowToNextPage: () =>
+    set((state) => {
+      const overflow = getOverflowElements(state.elements, state.activePage);
+      if (overflow.length === 0) return state;
+
+      let pageCount = state.pageCount;
+      const targetPage = state.activePage + 1;
+      if (targetPage > pageCount) pageCount = targetPage;
+
+      const overflowIds = new Set(overflow.map((e) => e.id));
+      let y = CANVAS_PADDING;
+      const moved = [...overflow]
+        .sort((a, b) => a.y - b.y)
+        .map((el) => {
+          const next = { ...el, page: targetPage, y };
+          y += el.height + SECTION_GAP;
+          return next;
+        });
+
+      const kept = state.elements.filter((e) => !overflowIds.has(e.id));
+      const merged = autoSpacing(repositionForPage([...kept, ...moved], targetPage));
+
+      return {
+        ...pushHistory(state, merged),
+        pageCount,
+        activePage: targetPage,
+      };
+    }),
 
   setEditingId: (id) => set({ editingId: id }),
 
@@ -130,14 +208,15 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         width: 300,
         height: 28,
         zIndex: nextZIndex(state.elements),
-        text: "New text block",
+        text: "Click to edit",
         fontSize: 13,
         fill: "#18181b",
+        page: state.activePage,
       };
       return pushHistory(state, autoSpacing([...state.elements, el]));
     }),
 
-  addSectionBlock: (sectionType) =>
+  addSectionBlock: (sectionType, defaultContent) =>
     set((state) => {
       const el: EditorElement = {
         id: `section-${Date.now()}`,
@@ -148,9 +227,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         height: 80,
         zIndex: nextZIndex(state.elements),
         sectionType: sectionType ?? "experience",
-        content: "Section content…",
+        content: defaultContent ?? "Click to edit",
         fontSize: 12,
         fill: "#3f3f46",
+        page: state.activePage,
       };
       return pushHistory(state, autoSpacing([...state.elements, el]));
     }),
@@ -171,6 +251,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         strokeWidth: 2,
         cornerRadius: shapeType === "circle" ? 999 : 8,
         opacity: 0.9,
+        page: state.activePage,
       };
       return pushHistory(state, autoSpacing([...state.elements, el]));
     }),
@@ -187,6 +268,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         zIndex: nextZIndex(state.elements),
         src: src ?? "",
         fill: "#e4e4e7",
+        page: state.activePage,
       };
       return pushHistory(state, autoSpacing([...state.elements, el]));
     }),
@@ -202,6 +284,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         height: 2,
         zIndex: nextZIndex(state.elements),
         fill: "#d4d4d8",
+        page: state.activePage,
       };
       return pushHistory(state, autoSpacing([...state.elements, el]));
     }),
@@ -238,6 +321,25 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         ...pushHistory(state, next),
         selectedId: state.selectedId === id ? null : state.selectedId,
       };
+    }),
+
+  reorderElements: (orderedIds) =>
+    set((state) => {
+      const byId = new Map(state.elements.map((e) => [e.id, e]));
+      const ordered = orderedIds
+        .map((id) => byId.get(id))
+        .filter((e): e is EditorElement => Boolean(e));
+      const missing = state.elements.filter((e) => !orderedIds.includes(e.id));
+      const fullOrder = [...ordered, ...missing];
+      if (fullOrder.length === 0) return state;
+
+      let y = CANVAS_PADDING;
+      const next = fullOrder.map((el) => {
+        const repositioned = { ...el, y };
+        y += el.height + SECTION_GAP;
+        return repositioned;
+      });
+      return pushHistory(state, autoSpacing(next));
     }),
 
   bringForward: (id) =>
@@ -301,11 +403,12 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 }));
 
 export function getCanvasStateFromStore() {
-  const { elements } = useEditorStore.getState();
+  const { elements, pageCount } = useEditorStore.getState();
   return {
     width: 794,
     height: 1123,
     background: "#ffffff",
     elements,
+    pageCount,
   };
 }

@@ -22,9 +22,21 @@ function readEnv(name: string): string | null {
 }
 
 export function isPaddleConfigured(): boolean {
-  return Boolean(
-    readEnv("PADDLE_API_KEY") &&
-      (readEnv("PADDLE_BASIC_PRICE_ID") || readEnv("PADDLE_PRO_PRICE_ID"))
+  const clientToken = readEnv("NEXT_PUBLIC_PADDLE_CLIENT_TOKEN");
+  const hasClientToken = Boolean(clientToken && !isPaddlePlaceholder(clientToken));
+  const hasApiKey = Boolean(readEnv("PADDLE_API_KEY"));
+  const hasPriceIds = Boolean(getPaddlePriceId("basic") || getPaddlePriceId("pro"));
+
+  return hasApiKey || hasClientToken || hasPriceIds;
+}
+
+function isPaddlePlaceholder(value: string): boolean {
+  const lower = value.toLowerCase();
+  return (
+    lower.includes("your_") ||
+    lower.includes("your-") ||
+    lower.endsWith("_here") ||
+    lower.includes("changeme")
   );
 }
 

@@ -1,5 +1,19 @@
 {
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "installCommand": "npm install --include=dev"
+  "installCommand": "npm install --include=dev",
+  "functions": {
+    "app/api/upload/pdf/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cv/export/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/resumes/publish-export/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cv/generate/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }

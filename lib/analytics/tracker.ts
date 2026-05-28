@@ -5,6 +5,7 @@ import {
   isAnalyticsOptedOut,
   isPostHogConfigured,
 } from "@/lib/utils/analytics/env";
+import { enqueueLegacyAnalyticsEvent } from "@/lib/analytics/legacy-queue";
 
 const LEGACY_EVENT_MAP: Partial<Record<AnalyticsEventName, string>> = {
   template_selected: "template_select",
@@ -75,7 +76,7 @@ export async function captureAnalyticsEvent(
 
   const legacyType =
     LEGACY_EVENT_MAP[event as AnalyticsEventName] ?? event;
-  await persistLegacyEvent(legacyType, enriched);
+  enqueueLegacyAnalyticsEvent(legacyType, enriched, persistLegacyEvent);
 }
 
 export class AnalyticsTracker {

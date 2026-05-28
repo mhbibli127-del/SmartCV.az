@@ -50,7 +50,21 @@ export default function GoogleSignInButton({
 
     setLoading(true);
     try {
-      await signIn("google", { callbackUrl, redirect: true });
+      const result = await signIn("google", { callbackUrl, redirect: false });
+      if (result?.error) {
+        toast({
+          title: "Google sign-in failed",
+          description: "Could not start Google authentication. Please try again.",
+          variant: "error",
+        });
+        setLoading(false);
+        return;
+      }
+      if (result?.url) {
+        window.location.href = result.url;
+        return;
+      }
+      window.location.href = callbackUrl;
     } catch {
       setLoading(false);
       toast({

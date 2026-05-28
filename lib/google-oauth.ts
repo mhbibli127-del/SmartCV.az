@@ -1,9 +1,19 @@
 import { getNextAuthUrl } from "@/lib/env";
 
+/** Google OAuth client id from env (server-side). */
+export function getGoogleClientId(): string {
+  return process.env.GOOGLE_CLIENT_ID?.trim() ?? "";
+}
+
+/** Google OAuth client secret from env (server-side). */
+export function getGoogleClientSecret(): string {
+  return process.env.GOOGLE_CLIENT_SECRET?.trim() ?? "";
+}
+
 /** True when Google OAuth credentials are present and not placeholders. */
 export function isGoogleOAuthConfigured(): boolean {
-  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+  const clientId = getGoogleClientId();
+  const clientSecret = getGoogleClientSecret();
   if (!clientId || !clientSecret) return false;
   if (clientId.length < 10 || clientSecret.length < 10) return false;
   return true;

@@ -1,0 +1,23 @@
+export type PdfImportPayload = {
+  fullName?: string;
+  email?: string;
+  phone?: string;
+  location?: string;
+  website?: string;
+  title?: string;
+  targetIndustry?: string;
+  summary?: string;
+  rawExperience?: string;
+  rawEducation?: string;
+  rawSkills?: string;
+  experience?: unknown[];
+  education?: unknown[];
+  skills?: string[];
+  achievements?: string[];
+  source?: string;
+  success?: boolean;
+  partial?: boolean;
+  message?: string;
+  error?: string;
+  code?: string;
+};

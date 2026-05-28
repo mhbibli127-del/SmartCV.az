@@ -12,9 +12,10 @@ type Props = {
   isSelected: boolean;
   onSelect: (id: string) => void;
   onDoubleClick?: (id: string) => void;
+  disableDrag?: boolean;
 };
 
-function ShapeElementInner({ element, isSelected, onSelect, onDoubleClick }: Props) {
+function ShapeElementInner({ element, isSelected, onSelect, onDoubleClick, disableDrag }: Props) {
   const elements = useEditorStore((s) => s.elements);
   const snapEnabled = useEditorStore((s) => s.snapEnabled);
   const setAlignmentGuides = useEditorStore((s) => s.setAlignmentGuides);
@@ -62,7 +63,7 @@ function ShapeElementInner({ element, isSelected, onSelect, onDoubleClick }: Pro
       y={element.y}
       width={element.width}
       height={element.height}
-      draggable={!element.locked}
+      draggable={!element.locked && !disableDrag}
       opacity={opacity}
       onClick={() => onSelect(element.id)}
       onTap={() => onSelect(element.id)}

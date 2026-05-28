@@ -1,74 +1,94 @@
 "use client";
 
 import { memo, useState } from "react";
-import { Crown } from "lucide-react";
-import type { TemplateMetadata } from "@/types/design-system";
-import { isAtsOptimized } from "@/lib/design-engine/core-templates";
+import { motion } from "framer-motion";
+import { Crown, Eye, Type } from "lucide-react";
+import type { CvEditorTemplate } from "@/types/cv-editor";
+import { CvTemplateThumbnail } from "@/components/templates/CvTemplateThumbnail";
 import { cn } from "@/lib/utils";
 
 interface TemplateCardProps {
-  template: TemplateMetadata & { category?: string };
+  template: CvEditorTemplate;
   onUse: () => void;
+  onPreview: () => void;
 }
 
-function TemplateCardInner({ template, onUse }: TemplateCardProps) {
+function TemplateCardInner({ template, onUse, onPreview }: TemplateCardProps) {
   const [hover, setHover] = useState(false);
-  const atsOptimized = isAtsOptimized(template);
-  const category =
-    "category" in template && template.category
-      ? String(template.category)
-      : template.industry[0] ?? "General";
 
   return (
-    <article
-      className="group relative flex flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm transition hover:border-zinc-300 hover:shadow-md"
+    <motion.article
+      layout
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -6 }}
+      transition={{ duration: 0.25 }}
+      className="group relative flex flex-col overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm transition-shadow hover:border-zinc-300 hover:shadow-xl"
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div className="relative aspect-[3/4] w-full overflow-hidden">
-        <div
-          className="absolute inset-0 transition-transform duration-500 group-hover:scale-[1.02]"
-          style={{ background: template.previewGradient }}
-        />
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/50 to-transparent" />
+      <div className="relative p-3 pb-0">
+        <motion.div
+          className="overflow-hidden rounded-xl ring-1 ring-zinc-100"
+          animate={{ scale: hover ? 1.02 : 1 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+        >
+          <CvTemplateThumbnail template={template} />
+        </motion.div>
+
+        <span className="absolute left-5 top-5 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 shadow-sm backdrop-blur">
+          {template.category}
+        </span>
 
         {template.premium && (
-          <Crown
-            className="absolute right-3 top-3 h-4 w-4 text-amber-400 drop-shadow"
-            aria-label="Premium template"
-          />
-        )}
-
-        {atsOptimized && (
-          <span
-            className="absolute left-3 top-3 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-medium text-emerald-700 backdrop-blur-sm"
-            title={hover ? `ATS score: ${template.theme.atsScore}%` : undefined}
-          >
-            ATS Optimized
+          <span className="absolute right-5 top-5 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+            <Crown className="h-3 w-3" />
+            Premium
           </span>
         )}
 
-        <div
+        {template.atsOptimized && !template.premium && (
+          <span className="absolute right-5 top-5 rounded-full bg-emerald-500/95 px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+            ATS
+          </span>
+        )}
+
+        <motion.div
           className={cn(
-            "absolute inset-x-0 bottom-0 flex justify-center p-4 transition-opacity duration-200",
-            hover ? "opacity-100" : "opacity-0"
+            "absolute inset-x-3 bottom-3 flex gap-2 p-2",
+            hover ? "opacity-100" : "pointer-events-none opacity-0"
           )}
+          transition={{ duration: 0.2 }}
         >
           <button
             type="button"
-            onClick={onUse}
-            className="w-full rounded-xl bg-white py-2.5 text-sm font-semibold text-zinc-900 shadow-lg transition hover:bg-zinc-50"
+            onClick={onPreview}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/30 bg-white/95 py-2.5 text-sm font-medium text-zinc-800 shadow-lg backdrop-blur hover:bg-white"
           >
-            Use template
+            <Eye className="h-4 w-4" />
+            Preview
           </button>
-        </div>
+          <button
+            type="button"
+            onClick={onUse}
+            className="flex-1 rounded-xl bg-zinc-900 py-2.5 text-sm font-semibold text-white shadow-lg hover:bg-zinc-800"
+          >
+            Use Template
+          </button>
+        </motion.div>
       </div>
 
-      <div className="px-4 py-3">
-        <h3 className="text-sm font-semibold text-zinc-900">{template.title}</h3>
-        <p className="mt-0.5 text-xs text-zinc-500">{category}</p>
+      <div className="space-y-1 px-4 py-3">
+        <h3 className="text-sm font-semibold text-zinc-900">{template.name}</h3>
+        <p className="line-clamp-2 text-xs leading-relaxed text-zinc-500">
+          {template.description}
+        </p>
+        <p className="flex items-center gap-1 pt-1 text-[11px] text-zinc-400">
+          <Type className="h-3 w-3" />
+          {template.fonts.heading}
+        </p>
       </div>
-    </article>
+    </motion.article>
   );
 }
 

@@ -3,7 +3,7 @@ import GoogleProvider from "next-auth/providers/google";
 import { isBuildPhase } from "@/lib/build";
 import { getNextAuthSecret, getNextAuthUrl } from "@/lib/env";
 import { ensureGoogleUser } from "@/lib/google-session-bridge";
-import { isGoogleOAuthConfigured } from "@/lib/google-oauth";
+import { isGoogleOAuthConfigured, getGoogleClientId, getGoogleClientSecret } from "@/lib/google-oauth";
 
 let cachedOptions: NextAuthOptions | null = null;
 
@@ -12,8 +12,8 @@ function buildProviders() {
 
   return [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!.trim(),
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!.trim(),
+      clientId: getGoogleClientId(),
+      clientSecret: getGoogleClientSecret(),
       allowDangerousEmailAccountLinking: true,
       authorization: {
         params: {
@@ -103,7 +103,11 @@ export function getAuthOptions(): NextAuthOptions {
         return true;
       },
       async redirect({ url, baseUrl }) {
-        const resolvedBase = (baseUrl || getNextAuthUrl()).replace(/\/$/, "");
+        const resolvedBase = (
+          process.env.NODE_ENV === "development"
+            ? getNextAuthUrl()
+            : baseUrl || getNextAuthUrl()
+        ).replace(/\/$/, "");
 
         // Preserve OAuth error redirects to login
         if (url.includes("error=")) {

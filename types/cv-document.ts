@@ -8,6 +8,14 @@ export type CVSectionType =
   | "projects"
   | "languages";
 
+export type SectionDisplayStyle =
+  | "default"
+  | "timeline"
+  | "bordered"
+  | "compact"
+  | "modern"
+  | "cards";
+
 export interface CVSection {
   id: string;
   type: CVSectionType;
@@ -29,6 +37,8 @@ export interface EditorElement {
   fontFamily?: string;
   fill?: string;
   fontWeight?: "normal" | "bold";
+  lineHeight?: number;
+  letterSpacing?: number;
   sectionType?: CVSectionType;
   content?: string;
   locked?: boolean;
@@ -40,6 +50,12 @@ export interface EditorElement {
   opacity?: number;
   /** image */
   src?: string;
+  imageScale?: number;
+  imageShape?: "square" | "rounded" | "circle";
+  /** multi-page */
+  page?: number;
+  /** section block display variant */
+  sectionStyle?: SectionDisplayStyle;
 }
 
 export interface EditorCanvasState {
@@ -47,6 +63,7 @@ export interface EditorCanvasState {
   height: number;
   elements: EditorElement[];
   background?: string;
+  pageCount?: number;
 }
 
 import type { DesignTheme } from "@/types/design-system";

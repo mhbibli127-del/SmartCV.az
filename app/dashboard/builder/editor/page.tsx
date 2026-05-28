@@ -9,7 +9,6 @@ import { Toolbar } from "@/components/editor/Toolbar";
 import { CanvaSidebar } from "@/components/editor/CanvaSidebar";
 import { getCanvasStateFromStore, useEditorStore } from "@/lib/editor-store";
 import { useToast } from "@/components/ui/use-toast";
-import { useSubscription } from "@/hooks/useSubscription";
 import { PageShell, PageHeader } from "@/components/ui/page-shell";
 import { Button } from "@/components/ui/button";
 import { createDefaultCanvas } from "@/lib/layout-engine";
@@ -26,7 +25,6 @@ import { FloatingToolbar } from "@/components/editor/FloatingToolbar";
 import { EditorRulers } from "@/components/editor/EditorRulers";
 import { LiveblocksRoom } from "@/components/realtime/LiveblocksRoom";
 import { SkeletonEditor } from "@/components/ui/skeleton";
-import { canUseCollab, canExportPng } from "@/lib/plan-features";
 import type { CanvasEditorHandle } from "@/components/editor/CanvasEditor";
 
 const CanvasEditor = dynamic(
@@ -48,7 +46,6 @@ function VisualEditorContent() {
   const cvId = params.get("id");
   const templateSlug = params.get("template");
   const { success, error: toastError } = useToast();
-  const { openUpgradeModal, plan } = useSubscription();
   const loadElements = useEditorStore((s) => s.loadElements);
   const elements = useEditorStore((s) => s.elements);
   const markSaved = useEditorStore((s) => s.markSaved);
@@ -146,7 +143,6 @@ function VisualEditorContent() {
     });
     const data = await res.json();
     if (!res.ok) {
-      if (data.code === "CV_LIMIT_REACHED") openUpgradeModal();
       throw new Error(data.error || "Save failed");
     }
     markSaved();
@@ -154,7 +150,7 @@ function VisualEditorContent() {
       router.replace(`/dashboard/builder/editor?id=${data.cvId}`);
     }
     return data;
-  }, [cvId, title, markSaved, router, openUpgradeModal, activeTheme, selectedTemplate]);
+  }, [cvId, title, markSaved, router, activeTheme, selectedTemplate]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -169,10 +165,6 @@ function VisualEditorContent() {
   };
 
   const handleExportPng = () => {
-    if (!canExportPng(plan)) {
-      openUpgradeModal();
-      return;
-    }
     const dataUrl = canvasRef.current?.exportPng();
     if (!dataUrl) {
       toastError("Export failed", "Canvas not ready.");
@@ -242,7 +234,7 @@ function VisualEditorContent() {
         saving={saving}
       />
 
-      <CollabBar presence={presence} connected={connected} enabled={Boolean(cvId) && canUseCollab(plan)} />
+      <CollabBar presence={presence} connected={connected} enabled={Boolean(cvId)} />
 
       <div className="flex min-h-[calc(100vh-280px)] gap-4">
         <CanvaSidebar cvId={cvId} />

@@ -3,6 +3,9 @@ import { getAuthenticatedUser } from "@/lib/session";
 import { getOpenAI } from "@/lib/openai";
 import { extractTextFromPdf, sanitizePdfText } from "@/lib/pdf-parser";
 import { assertCanUseAI, incrementAiUsed } from "@/lib/ai-limit";
+import { PDF_FORM_FIELD_NAMES } from "@/lib/pdf/constants";
+import { validatePdfBuffer } from "@/lib/pdf/validation";
+import { handleApiError, unauthorized } from "@/lib/api-errors";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -26,12 +29,22 @@ const EMPTY_CV = {
   source: "pdf_upload",
 };
 
+function resolvePdfFile(formData: FormData): File | null {
+  for (const key of PDF_FORM_FIELD_NAMES) {
+    const entry = formData.get(key);
+    if (entry instanceof File && entry.size > 0) {
+      return entry;
+    }
+  }
+  return null;
+}
+
 /** POST /api/upload/pdf — parse PDF → structured CV JSON */
 export async function POST(req: NextRequest) {
   try {
     const user = await getAuthenticatedUser(req);
     if (!user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorized();
     }
 
     const aiCheck = await assertCanUseAI(user.email);
@@ -43,17 +56,36 @@ export async function POST(req: NextRequest) {
     }
 
     const formData = await req.formData();
-    const file = formData.get("pdf") as File | null;
+    const file = resolvePdfFile(formData);
 
-    if (!file || file.type !== "application/pdf") {
+    if (!file) {
       return NextResponse.json(
-        { ...EMPTY_CV, message: "Please upload a valid PDF file." },
+        {
+          ...EMPTY_CV,
+          error: "Missing PDF file. Use form field pdf, file, or document.",
+          code: "MISSING_FILE",
+          message: "Please choose a PDF file to upload.",
+        },
         { status: 400 }
       );
     }
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    const validation = validatePdfBuffer(buffer, file.name || "upload.pdf");
+
+    if (!validation.ok) {
+      return NextResponse.json(
+        {
+          ...EMPTY_CV,
+          error: validation.error,
+          code: validation.code,
+          message: validation.error,
+        },
+        { status: 400 }
+      );
+    }
+
     const rawText = sanitizePdfText(await extractTextFromPdf(buffer));
 
     if (!rawText || rawText.length < 50) {
@@ -62,6 +94,7 @@ export async function POST(req: NextRequest) {
         message:
           "We couldn't read enough text from this PDF. Try a text-based CV (not a scanned image).",
         partial: true,
+        code: "INSUFFICIENT_TEXT",
       });
     }
 
@@ -101,10 +134,27 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[upload/pdf]", err);
-    return NextResponse.json({
-      ...EMPTY_CV,
-      message: "PDF processing hit a snag — you can still build your CV manually.",
-      partial: true,
-    });
+    const message =
+      err instanceof Error && err.message.includes("OPENAI_API_KEY")
+        ? "AI parsing is not configured. Set OPENAI_API_KEY to import PDFs."
+        : "PDF processing hit a snag — you can still build your CV manually.";
+
+    return NextResponse.json(
+      {
+        ...EMPTY_CV,
+        message,
+        partial: true,
+        code: "PROCESSING_ERROR",
+      },
+      { status: 500 }
+    );
   }
+}
+
+export async function GET() {
+  return NextResponse.json({
+    message: "POST multipart/form-data with field pdf (or file / document).",
+    maxBytes: 10 * 1024 * 1024,
+    accept: "application/pdf,.pdf",
+  });
 }

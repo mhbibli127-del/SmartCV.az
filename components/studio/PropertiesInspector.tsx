@@ -4,9 +4,10 @@ import { memo } from "react";
 import { Copy, Lock, Trash2, Unlock } from "lucide-react";
 import { useEditorStore } from "@/lib/editor-store";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { StudioImageControls } from "@/components/studio/StudioImageControls";
+import { StudioSectionStylePanel } from "@/components/studio/StudioSectionStylePanel";
 
-function PropertiesInspectorInner() {
+function PropertiesInspectorInner({ cvId }: { cvId?: string | null }) {
   const selectedId = useEditorStore((s) => s.selectedId);
   const elements = useEditorStore((s) => s.elements);
   const updateElement = useEditorStore((s) => s.updateElement);
@@ -43,27 +44,37 @@ function PropertiesInspectorInner() {
               value={
                 selected.type === "section" ? selected.content ?? "" : selected.text ?? ""
               }
-              onChange={(e) =>
-                updateElement(
-                  selected.id,
+              onChange={(e) => {
+                const patch =
                   selected.type === "section"
                     ? { content: e.target.value }
-                    : { text: e.target.value }
-                )
-              }
+                    : { text: e.target.value };
+                updateElement(selected.id, patch, false);
+              }}
+              onBlur={(e) => {
+                const patch =
+                  selected.type === "section"
+                    ? { content: e.target.value }
+                    : { text: e.target.value };
+                updateElement(selected.id, patch, true);
+              }}
             />
           </div>
         )}
 
-        {selected.type === "image" && (
+        {selected.type === "section" && (
           <div>
-            <label className="text-[11px] font-medium uppercase text-zinc-400">Image URL</label>
-            <Input
-              value={selected.src ?? ""}
-              onChange={(e) => updateElement(selected.id, { src: e.target.value })}
-              className="mt-1.5 h-9 text-xs"
-            />
+            <label className="text-[11px] font-medium uppercase text-zinc-400">
+              Section style
+            </label>
+            <div className="mt-2">
+              <StudioSectionStylePanel />
+            </div>
           </div>
+        )}
+
+        {selected.type === "image" && (
+          <StudioImageControls cvId={cvId} compact />
         )}
 
         {(selected.type === "text" || selected.type === "section") && (

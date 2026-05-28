@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+
+      <rect width="595" height="842" fill="#ffffff"/>
+      <text x="48" y="64" font-family="Inter,sans-serif" font-size="26" font-weight="700" fill="#0f766e">Sophia Bennett</text>
+      <line x1="120" y1="100" x2="120" y2="420" stroke="#14b8a6" stroke-width="3"/>
+      <circle cx="120" cy="140" r="8" fill="#0f766e"/>
+      <text x="148" y="144" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#134e4a">2021 · Google</text>
+      <circle cx="120" cy="220" r="8" fill="#14b8a6"/>
+      <text x="148" y="224" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#134e4a">2019 · Spotify</text>
+      <circle cx="120" cy="300" r="8" fill="#14b8a6"/>
+      <text x="148" y="304" font-family="Inter,sans-serif" font-size="12" font-weight="600" fill="#134e4a">Stanford University</text>
+    
+</svg>

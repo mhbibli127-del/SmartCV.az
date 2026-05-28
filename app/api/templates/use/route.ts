@@ -13,7 +13,6 @@ export async function POST(req: NextRequest) {
     const { templateId } = await req.json();
 
     // In production, save template selection to database
-    console.log('User selected template:', templateId);
 
     return NextResponse.json({ success: true });
   } catch (error) {

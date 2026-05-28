@@ -12,8 +12,6 @@ import {
 
   LayoutDashboard,
 
-  FileEdit,
-
   Library,
 
   UserCircle,
@@ -43,12 +41,6 @@ import { useLogout } from "@/hooks/useLogout";
 
 import { api } from "@/lib/api-client";
 
-import UsageBanner from "@/components/UsageBanner";
-
-import { useSubscription } from "@/hooks/useSubscription";
-
-import UpgradeToProButton from "@/components/UpgradeToProButton";
-
 import { useCurrentUser, displayNameOf, initialOf } from "@/hooks/useCurrentUser";
 
 import { useAuthGuard } from "@/hooks/useAuthGuard";
@@ -58,12 +50,12 @@ import { shouldFetchAuthenticatedApis } from "@/lib/auth-client";
 import { useSession } from "next-auth/react";
 
 import { cn } from "@/lib/utils";
+import { DashboardPageTracker } from "@/components/dashboard/DashboardPageTracker";
 
 
 
 const navItems = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "My CVs", href: "/dashboard/builder", icon: FileEdit },
   { name: "Templates", href: "/dashboard/templates", icon: LayoutGrid },
   { name: "Studio", href: "/dashboard/studio", icon: PenLine },
   { name: "Examples", href: "/dashboard/examples", icon: Library },
@@ -79,7 +71,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const isFocusMode =
     pathname.startsWith("/dashboard/studio") ||
-    pathname.startsWith("/dashboard/builder/editor");
+    pathname.startsWith("/dashboard/builder/editor") ||
+    pathname.startsWith("/dashboard/editor");
 
   const isEditorFocus = isFocusMode;
 
@@ -94,8 +87,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { logout } = useLogout();
 
   const { success, error: toastError } = useToast();
-
-  const { plan } = useSubscription();
 
   const { user } = useCurrentUser();
 
@@ -181,6 +172,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     <div className="flex min-h-screen bg-[#f7f7f8] text-zinc-900">
 
+      <DashboardPageTracker />
+
       <button
 
         type="button"
@@ -238,16 +231,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             const isActive =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
-                : item.href === "/dashboard/builder"
-                  ? pathname === "/dashboard/builder" ||
-                    pathname.startsWith("/dashboard/builder/editor")
-                  : item.href === "/dashboard/studio"
-                    ? pathname === "/dashboard/studio" ||
-                      pathname.startsWith("/dashboard/studio")
-                    : item.href === "/dashboard/templates"
-                      ? pathname === "/dashboard/templates"
-                      : pathname === item.href ||
-                        (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
+                : item.href === "/dashboard/studio"
+                  ? pathname === "/dashboard/studio" ||
+                    pathname.startsWith("/dashboard/studio")
+                  : item.href === "/dashboard/templates"
+                    ? pathname === "/dashboard/templates" ||
+                      pathname.startsWith("/dashboard/editor")
+                    : pathname === item.href ||
+                      (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
 
             return (
 
@@ -312,38 +303,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
           )}
-
-          <div className="rounded-[12px] border border-black/[0.06] bg-zinc-50/80 p-4">
-
-            <p className="text-xs font-medium uppercase tracking-wide text-zinc-400">
-
-              Plan
-
-            </p>
-
-            <p className="mt-0.5 text-sm font-semibold capitalize text-zinc-900">
-
-              {plan}
-
-            </p>
-
-            {plan === "free" && (
-
-              <UpgradeToProButton
-
-                className="mt-3 w-full"
-
-                size="sm"
-
-                variant="default"
-
-                label="Upgrade"
-
-              />
-
-            )}
-
-          </div>
 
           <button
 
@@ -432,8 +391,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             isFullWidthStudio ? "max-w-none space-y-0 py-0" : "max-w-6xl"
           )}
         >
-          {!isFullWidthStudio && <UsageBanner />}
-
           {children}
 
         </main>

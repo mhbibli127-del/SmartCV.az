@@ -5,6 +5,8 @@ import { generateOTP } from "@/lib/otp";
 import { getLocalDb, saveLocalDb } from "@/lib/db";
 import { sendOtpEmail } from "@/lib/email";
 import { setAuthStateCookie } from "@/lib/auth-cookie";
+import { handleApiError, tooManyRequests } from "@/lib/api-errors";
+import { clientRateLimitKey, rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,11 @@ const SESSION_MAX_AGE = 7 * 24 * 60 * 60; // 7 days
 
 export async function POST(req: NextRequest) {
   try {
+    const limit = rateLimit(clientRateLimitKey(req, "auth:login"), 12, 15 * 60_000);
+    if (!limit.ok) {
+      return tooManyRequests(limit.retryAfterSec);
+    }
+
     const body = (await req.json().catch(() => ({}))) as {
       email?: string;
       password?: string;
@@ -98,9 +105,6 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Failed to login";
-    // eslint-disable-next-line no-console
-    console.error("[login]", err);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleApiError(err, "auth/login POST", "Failed to login");
   }
 }

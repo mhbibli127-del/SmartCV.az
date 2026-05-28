@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { memo, useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import { useBuilder } from "@/lib/builder-state";
 import { useAnalytics } from "@/lib/analytics";
 import { ChevronDown, X } from "lucide-react";
@@ -13,7 +14,7 @@ interface Template {
   imageUrl: string;
 }
 
-export default function TemplateSelector() {
+function TemplateSelectorInner() {
   const { selectedTemplate, setTemplate } = useBuilder();
   const { trackTemplateView } = useAnalytics();
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -39,26 +40,30 @@ export default function TemplateSelector() {
     fetchTemplates();
   }, []);
 
-  const handleSelectTemplate = async (template: Template) => {
+  const handleSelectTemplate = useCallback(async (template: Template) => {
     await trackTemplateView(template.id, template.title, template.category);
     setTemplate(template.id, template.title);
     setIsOpen(false);
-  };
+  }, [setTemplate, trackTemplateView]);
 
   const selectedTemplateData = templates.find(t => t.id === selectedTemplate);
 
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-3 px-4 py-3 bg-white border border-gray-300 rounded-xl hover:border-gray-400 transition-all"
       >
         {selectedTemplateData ? (
           <>
-            <img
+            <Image
               src={selectedTemplateData.imageUrl}
               alt={selectedTemplateData.title}
-              className="w-12 h-16 object-cover rounded"
+              width={48}
+              height={64}
+              unoptimized
+              className="h-16 w-12 rounded object-cover"
             />
             <div className="text-left">
               <p className="font-semibold text-gray-900 text-sm">{selectedTemplateData.title}</p>
@@ -102,10 +107,13 @@ export default function TemplateSelector() {
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
-                  <img
+                  <Image
                     src={template.imageUrl}
                     alt={template.title}
-                    className="w-full h-24 object-cover rounded mb-2"
+                    width={160}
+                    height={96}
+                    unoptimized
+                    className="mb-2 h-24 w-full rounded object-cover"
                   />
                   <p className="font-semibold text-gray-900 text-xs">{template.title}</p>
                   <p className="text-xs text-gray-500">{template.category}</p>
@@ -118,3 +126,5 @@ export default function TemplateSelector() {
     </div>
   );
 }
+
+export default memo(TemplateSelectorInner);

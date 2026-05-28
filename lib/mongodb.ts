@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import type { Db } from "mongodb";
-import { maskMongoUri, requireMongoUri } from "@/lib/env";
+import { maskMongoUri, requireMongoUri, isMongoConfigured } from "@/lib/env";
+import { isMongoCircuitOpen, openMongoCircuit, recordMongoFailure } from "@/lib/db-circuit";
 
 /**
  * Production MongoDB connection for Next.js App Router + Vercel serverless.
@@ -32,16 +33,16 @@ if (!global.__mongooseCache) {
 }
 
 const CONNECT_OPTIONS: mongoose.ConnectOptions = {
-  /** Buffer queries until connection is ready — prevents "findOne before connect" crashes */
   bufferCommands: true,
-  maxPoolSize: 10,
+  maxPoolSize: process.env.NODE_ENV === "production" ? 10 : 5,
   minPoolSize: 0,
-  serverSelectionTimeoutMS: 15_000,
-  socketTimeoutMS: 45_000,
-  connectTimeoutMS: 15_000,
+  serverSelectionTimeoutMS: process.env.NODE_ENV === "production" ? 10_000 : 5_000,
+  socketTimeoutMS: 30_000,
+  connectTimeoutMS: process.env.NODE_ENV === "production" ? 10_000 : 5_000,
   heartbeatFrequencyMS: 10_000,
   retryWrites: true,
   retryReads: true,
+  family: 4,
 };
 
 function isDev(): boolean {
@@ -50,6 +51,7 @@ function isDev(): boolean {
 
 function log(message: string, meta?: Record<string, unknown>): void {
   if (!isDev()) return;
+  if (isMongoCircuitOpen() && message !== "Connection paused") return;
   // eslint-disable-next-line no-console
   console.log(`[mongodb] ${message}`, meta ?? "");
 }
@@ -63,7 +65,19 @@ function resetCache(): void {
   cached.promise = null;
 }
 
+let mongoFailureLogged = false;
+
+function logFailureOnce(message: string, meta?: Record<string, unknown>): void {
+  if (mongoFailureLogged) return;
+  mongoFailureLogged = true;
+  // eslint-disable-next-line no-console
+  console.warn(`[mongodb] ${message}`, meta ?? "");
+}
+
 async function createConnection(): Promise<typeof mongoose> {
+  if (!isMongoConfigured()) {
+    throw new Error("[mongodb] MONGODB_URI is not configured");
+  }
   const uri = requireMongoUri();
   const safeUri = maskMongoUri(uri);
 
@@ -100,8 +114,7 @@ async function createConnection(): Promise<typeof mongoose> {
   } catch (err) {
     resetCache();
     const message = err instanceof Error ? err.message : String(err);
-    // eslint-disable-next-line no-console
-    console.error("[mongodb] Connection failed", { uri: safeUri, error: message });
+    logFailureOnce("Connection failed — circuit open for 5 min", { error: message });
     throw err;
   }
 }
@@ -149,6 +162,14 @@ function waitForDbHandle(timeoutMs: number): Promise<void> {
  * Always await this before Mongoose queries or getDatabase().
  */
 export async function connectDB(): Promise<typeof mongoose> {
+  if (!isMongoConfigured()) {
+    throw new Error("[mongodb] Not configured — set MONGODB_URI or disable Mongo features");
+  }
+
+  if (isMongoCircuitOpen()) {
+    throw new Error("[mongodb] Connection paused (circuit open)");
+  }
+
   if (isConnected() && cached.conn) {
     log("Reusing connection", {
       host: mongoose.connection.host,
@@ -179,6 +200,8 @@ export async function connectDB(): Promise<typeof mongoose> {
     return conn;
   } catch (err) {
     resetCache();
+    recordMongoFailure(err);
+    openMongoCircuit();
     throw err;
   }
 }
@@ -190,6 +213,13 @@ export const connectMongoose = connectDB;
  * Native MongoDB Db handle for direct driver operations (lib/models.ts, etc.)
  */
 export async function getDatabase(): Promise<Db> {
+  if (!isMongoConfigured()) {
+    throw new Error("[mongodb] Not configured");
+  }
+  if (isMongoCircuitOpen()) {
+    throw new Error("[mongodb] Connection paused (circuit open)");
+  }
+
   await connectDB();
 
   if (mongoose.connection.db) {

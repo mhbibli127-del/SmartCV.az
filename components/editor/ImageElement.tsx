@@ -1,25 +1,32 @@
 "use client";
 
 import { memo, useCallback, useEffect, useState } from "react";
-import { Group, Rect, Image as KonvaImage } from "react-konva";
+import { Group, Rect, Image as KonvaImage, Text } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import type { EditorElement } from "@/types/cv-document";
 import { useEditorStore } from "@/lib/editor-store";
 import { clampElement, computeAlignmentSnap } from "@/lib/layout-engine";
+import {
+  getImageCrop,
+  imageCornerRadius,
+} from "@/components/editor/image-utils";
 
 type Props = {
   element: EditorElement;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  disableDrag?: boolean;
 };
 
-function ImageElementInner({ element, isSelected, onSelect }: Props) {
+function ImageElementInner({ element, isSelected, onSelect, disableDrag }: Props) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const elements = useEditorStore((s) => s.elements);
   const snapEnabled = useEditorStore((s) => s.snapEnabled);
   const setAlignmentGuides = useEditorStore((s) => s.setAlignmentGuides);
   const commitElementMove = useEditorStore((s) => s.commitElementMove);
   const clearAlignmentGuides = useEditorStore((s) => s.clearAlignmentGuides);
+
+  const radius = imageCornerRadius(element);
 
   useEffect(() => {
     if (!element.src) {
@@ -61,6 +68,8 @@ function ImageElementInner({ element, isSelected, onSelect }: Props) {
     [element.id, commitElementMove, clearAlignmentGuides]
   );
 
+  const crop = image ? getImageCrop(image, element.imageScale ?? 1) : null;
+
   return (
     <Group
       id={element.id}
@@ -69,7 +78,7 @@ function ImageElementInner({ element, isSelected, onSelect }: Props) {
       y={element.y}
       width={element.width}
       height={element.height}
-      draggable={!element.locked}
+      draggable={!element.locked && !disableDrag}
       onClick={() => onSelect(element.id)}
       onTap={() => onSelect(element.id)}
       onDragMove={handleDragMove}
@@ -81,15 +90,26 @@ function ImageElementInner({ element, isSelected, onSelect }: Props) {
         fill={element.fill ?? "#f4f4f5"}
         stroke={isSelected ? "#6366f1" : "#e4e4e7"}
         strokeWidth={isSelected ? 2 : 1}
-        cornerRadius={8}
+        cornerRadius={radius}
+        dash={image ? undefined : [6, 4]}
       />
-      {image ? (
-        <KonvaImage image={image} width={element.width} height={element.height} cornerRadius={8} />
-      ) : (
-        <Rect
+      {image && crop ? (
+        <KonvaImage
+          image={image}
           width={element.width}
           height={element.height}
-          fill="#fafafa"
+          cornerRadius={radius}
+          crop={crop}
+        />
+      ) : (
+        <Text
+          width={element.width}
+          height={element.height}
+          text="Upload image"
+          fontSize={12}
+          fill="#a1a1aa"
+          align="center"
+          verticalAlign="middle"
           listening={false}
         />
       )}

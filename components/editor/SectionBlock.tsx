@@ -1,19 +1,22 @@
 "use client";
 
 import { memo, useCallback } from "react";
-import { Group, Rect, Text } from "react-konva";
+import { Group, Text } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import type { EditorElement } from "@/types/cv-document";
 import { useEditorStore } from "@/lib/editor-store";
 import { clampElement, computeAlignmentSnap } from "@/lib/layout-engine";
+import { isPlaceholderContent } from "@/lib/section-styles";
+import { SectionBlockChrome, sectionContentLayout } from "@/components/editor/SectionBlockChrome";
 
 type Props = {
   element: EditorElement;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  disableDrag?: boolean;
 };
 
-function SectionBlockInner({ element, isSelected, onSelect }: Props) {
+function SectionBlockInner({ element, isSelected, onSelect, disableDrag }: Props) {
   const label = (element.sectionType ?? "section").toUpperCase();
   const elements = useEditorStore((s) => s.elements);
   const snapEnabled = useEditorStore((s) => s.snapEnabled);
@@ -21,6 +24,11 @@ function SectionBlockInner({ element, isSelected, onSelect }: Props) {
   const commitElementMove = useEditorStore((s) => s.commitElementMove);
   const clearAlignmentGuides = useEditorStore((s) => s.clearAlignmentGuides);
   const setEditingId = useEditorStore((s) => s.setEditingId);
+
+  const layout = sectionContentLayout(element, element.width, element.height);
+  const displayContent = isPlaceholderContent(element.content)
+    ? "Click to edit"
+    : (element.content ?? "");
 
   const handleDragMove = useCallback(
     (e: KonvaEventObject<DragEvent>) => {
@@ -61,50 +69,48 @@ function SectionBlockInner({ element, isSelected, onSelect }: Props) {
       y={element.y}
       width={element.width}
       height={element.height}
-      draggable={!element.locked}
-      onClick={() => onSelect(element.id)}
-      onTap={() => onSelect(element.id)}
+      draggable={!element.locked && !disableDrag}
+      onClick={() => {
+        onSelect(element.id);
+        if (isSelected && !element.locked) setEditingId(element.id);
+      }}
+      onTap={() => {
+        onSelect(element.id);
+        if (isSelected && !element.locked) setEditingId(element.id);
+      }}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onDragStart={() => onSelect(element.id)}
       onDblClick={() => setEditingId(element.id)}
       onDblTap={() => setEditingId(element.id)}
     >
-      <Rect
+      <SectionBlockChrome
+        element={element}
+        isSelected={isSelected}
         width={element.width}
         height={element.height}
-        fill="#fafafa"
-        stroke={isSelected ? "#6366f1" : "#e4e4e7"}
-        strokeWidth={isSelected ? 1.5 : 1}
-        cornerRadius={8}
       />
-      {element.locked && (
-        <Rect
-          width={element.width}
-          height={element.height}
-          fill="rgba(0,0,0,0.04)"
-          cornerRadius={8}
-          listening={false}
-        />
-      )}
       <Text
-        x={12}
-        y={10}
+        x={layout.labelX}
+        y={layout.labelY}
         text={label}
-        fontSize={9}
-        fill="#71717a"
+        fontSize={layout.labelSize}
+        fill={isPlaceholderContent(element.content) ? "#a1a1aa" : "#71717a"}
         letterSpacing={1}
         listening={false}
       />
       <Text
-        x={12}
-        y={28}
-        width={element.width - 24}
-        height={element.height - 36}
-        text={element.content ?? ""}
-        fontSize={element.fontSize ?? 12}
+        x={layout.contentX}
+        y={layout.contentY}
+        width={layout.contentW}
+        height={layout.contentH}
+        text={displayContent}
+        fontSize={layout.fontSize}
         fontFamily={element.fontFamily ?? "Inter"}
-        fill={element.fill ?? "#3f3f46"}
+        fill={isPlaceholderContent(element.content) ? "#a1a1aa" : (element.fill ?? "#3f3f46")}
+        fontStyle={isPlaceholderContent(element.content) ? "italic" : "normal"}
+        lineHeight={element.lineHeight}
+        letterSpacing={element.letterSpacing}
         wrap="word"
         listening={false}
       />

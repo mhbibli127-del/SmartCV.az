@@ -5,7 +5,6 @@ import {
   User,
   Shield,
   Bell,
-  CreditCard,
   Sparkles,
   Database,
 } from "lucide-react";
@@ -19,7 +18,6 @@ const NAV_ITEMS: AccountNavItem[] = [
     label: "Notifications",
     description: "Email and alert preferences",
   },
-  { id: "billing", label: "Billing", description: "Plan and invoices" },
   { id: "ai", label: "AI Preferences", description: "CV generation defaults" },
   { id: "privacy", label: "Data & Privacy", description: "Export and account data" },
 ];
@@ -28,7 +26,6 @@ const ICONS: Record<AccountSectionId, typeof User> = {
   profile: User,
   security: Shield,
   notifications: Bell,
-  billing: CreditCard,
   ai: Sparkles,
   privacy: Database,
 };
@@ -56,7 +53,7 @@ export default function AccountLayout({
           Settings
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-gray-500">
-          Manage your profile, security, billing, and preferences.
+          Manage your profile, security, and preferences.
         </p>
         {isSuperAdmin && (
           <span className="mt-3 inline-flex rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-amber-800">

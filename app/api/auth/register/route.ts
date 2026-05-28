@@ -5,6 +5,8 @@ import { generateOTP } from "@/lib/otp";
 import { getLocalDb, saveLocalDb } from "@/lib/db";
 import { sendOtpEmail } from "@/lib/email";
 import { setAuthStateCookie } from "@/lib/auth-cookie";
+import { handleApiError, tooManyRequests } from "@/lib/api-errors";
+import { clientRateLimitKey, rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +14,11 @@ const PRE_VERIFICATION_TTL = 60 * 60; // 1 hour for pending OTP flow
 
 export async function POST(request: Request) {
   try {
+    const limit = rateLimit(clientRateLimitKey(request, "auth:register"), 6, 60 * 60_000);
+    if (!limit.ok) {
+      return tooManyRequests(limit.retryAfterSec);
+    }
+
     const body = (await request.json().catch(() => ({}))) as {
       email?: string;
       password?: string;
@@ -75,11 +82,7 @@ export async function POST(request: Request) {
     setAuthStateCookie(response, PRE_VERIFICATION_TTL);
 
     return response;
-  } catch (error: any) {
-    // eslint-disable-next-line no-console
-    console.error("[register]", error);
-    const message =
-      error instanceof Error ? error.message : "Failed to register";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch (error) {
+    return handleApiError(error, "auth/register POST", "Failed to register");
   }
 }

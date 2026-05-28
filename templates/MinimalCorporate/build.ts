@@ -1,0 +1,138 @@
+import { A4_WIDTH, el, resetZIndex, SAMPLE, type TemplateFonts, type TemplateTheme } from "@/templates/shared";
+
+/** Ultra-clean single column — recruiter ATS layout */
+export function buildMinimalCorporate(theme: TemplateTheme, fonts: TemplateFonts) {
+  resetZIndex();
+  const pad = 56;
+  const w = A4_WIDTH - pad * 2;
+  let y = pad;
+
+  return [
+    el({
+      id: "name",
+      type: "text",
+      x: pad,
+      y,
+      width: w,
+      height: 36,
+      content: SAMPLE.name,
+      style: {
+        fontSize: 26,
+        fontWeight: 700,
+        color: theme.text,
+        fontFamily: fonts.heading,
+        letterSpacing: -0.5,
+      },
+    }),
+    el({
+      id: "title",
+      type: "text",
+      x: pad,
+      y: (y += 40),
+      width: w,
+      height: 22,
+      content: SAMPLE.title,
+      style: { fontSize: 13, color: theme.muted, fontFamily: fonts.body },
+    }),
+    el({
+      id: "rule",
+      type: "section",
+      x: pad,
+      y: (y += 32),
+      width: w,
+      height: 1,
+      content: "",
+      style: { background: theme.muted, opacity: 0.35 },
+    }),
+    el({
+      id: "contact",
+      type: "text",
+      x: pad,
+      y: (y += 16),
+      width: w,
+      height: 18,
+      content: SAMPLE.contact,
+      style: { fontSize: 10, color: theme.muted, fontFamily: fonts.body },
+    }),
+    el({
+      id: "summary-label",
+      type: "text",
+      x: pad,
+      y: (y += 40),
+      width: w,
+      height: 16,
+      content: "SUMMARY",
+      style: {
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: 2,
+        color: theme.text,
+        fontFamily: fonts.heading,
+      },
+    }),
+    el({
+      id: "summary",
+      type: "text",
+      x: pad,
+      y: (y += 22),
+      width: w,
+      height: 56,
+      content: SAMPLE.summary,
+      style: { fontSize: 11, color: theme.text, fontFamily: fonts.body, lineHeight: 1.65 },
+    }),
+    el({
+      id: "exp-label",
+      type: "text",
+      x: pad,
+      y: (y += 72),
+      width: w,
+      height: 16,
+      content: "EXPERIENCE",
+      style: {
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: 2,
+        color: theme.text,
+        fontFamily: fonts.heading,
+      },
+    }),
+    el({
+      id: "experience",
+      type: "text",
+      x: pad,
+      y: (y += 22),
+      width: w,
+      height: 140,
+      content: SAMPLE.experience,
+      sectionType: "experience",
+      style: { fontSize: 11, color: theme.text, fontFamily: fonts.body, lineHeight: 1.6 },
+    }),
+    el({
+      id: "edu-label",
+      type: "text",
+      x: pad,
+      y: (y += 156),
+      width: w,
+      height: 16,
+      content: "EDUCATION",
+      style: {
+        fontSize: 9,
+        fontWeight: 700,
+        letterSpacing: 2,
+        color: theme.text,
+        fontFamily: fonts.heading,
+      },
+    }),
+    el({
+      id: "education",
+      type: "text",
+      x: pad,
+      y: (y += 22),
+      width: w,
+      height: 72,
+      content: SAMPLE.education,
+      sectionType: "education",
+      style: { fontSize: 11, color: theme.text, fontFamily: fonts.body, lineHeight: 1.55 },
+    }),
+  ];
+}

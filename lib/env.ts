@@ -15,6 +15,7 @@ function sqliteFileUrl(relativeFile: string): string {
 const PLACEHOLDER_PATTERNS = [
   "your_",
   "your-",
+  "_here",
   "xxx",
   "changeme",
   "dummy_key",
@@ -137,12 +138,61 @@ export function getStripeWebhookSecret(): string | null {
   return readSecret("STRIPE_WEBHOOK_SECRET");
 }
 
+export function isStripeBillingConfigured(): boolean {
+  return Boolean(getStripeSecretKey() && getStripeWebhookSecret());
+}
+
+export function isPaddleBillingConfigured(): boolean {
+  const clientToken = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN?.trim();
+  const hasClientToken = Boolean(clientToken && !isPlaceholder(clientToken));
+  const basic =
+    process.env.PADDLE_PRICE_BASIC?.trim() ||
+    process.env.PADDLE_BASIC_PRICE_ID?.trim();
+  const pro =
+    process.env.PADDLE_PRICE_PRO?.trim() ||
+    process.env.PADDLE_PRO_PRICE_ID?.trim();
+  const hasPriceIds = Boolean(
+    (basic && !isPlaceholder(basic)) || (pro && !isPlaceholder(pro))
+  );
+  const hasApiKey = Boolean(readSecret("PADDLE_API_KEY"));
+
+  return hasApiKey || hasClientToken || hasPriceIds;
+}
+
+export function isPaymentConfigured(): boolean {
+  return isPaddleBillingConfigured() || isStripeBillingConfigured();
+}
+
+export function getDirectUrl(): string | null {
+  const raw = process.env.DIRECT_URL?.trim();
+  return raw && !isPlaceholder(raw) ? raw : null;
+}
+
 export function getMongoUri(): string | null {
   try {
     return requireMongoUri();
   } catch {
     return null;
   }
+}
+
+/** True when MONGODB_URI is set and looks like a valid Mongo connection string. */
+export function isMongoConfigured(): boolean {
+  const raw = process.env.MONGODB_URI?.trim();
+  if (!raw || isPlaceholder(raw)) return false;
+  try {
+    const uri = normalizeMongoUri(raw);
+    return /^mongodb(\+srv)?:\/\//i.test(uri);
+  } catch {
+    return false;
+  }
+}
+
+/** True when DATABASE_URL points to PostgreSQL (Supabase/production). */
+export function isPostgresConfigured(): boolean {
+  const raw = process.env.DATABASE_URL?.trim();
+  if (!raw || isPlaceholder(raw)) return false;
+  return raw.startsWith("postgresql://") || raw.startsWith("postgres://");
 }
 
 /** Redact credentials from a MongoDB URI for safe logging. */
@@ -284,11 +334,19 @@ export function getNextAuthSecret(): string {
 }
 
 export function getNextAuthUrl(): string {
+  const fallback = "http://localhost:3000";
+
+  // Local dev should use localhost for OAuth callbacks even when production
+  // URLs are present in the shared workspace `.env.local`.
+  if (process.env.NODE_ENV === "development") {
+    return fallback;
+  }
+
   return (
     process.env.NEXTAUTH_URL?.trim() ||
     process.env.NEXT_PUBLIC_APP_URL?.trim() ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-    "http://localhost:3000"
+    fallback
   );
 }
 
@@ -300,15 +358,21 @@ export interface EnvReport {
 }
 
 const REQUIRED_FOR_PROD = [
-  { name: "MONGODB_URI", read: getMongoUri },
-  { name: "STRIPE_SECRET_KEY", read: getStripeSecretKey },
-  { name: "STRIPE_WEBHOOK_SECRET", read: getStripeWebhookSecret },
+  { name: "DATABASE_URL", read: () => readSecret("DATABASE_URL") },
+  { name: "DIRECT_URL", read: getDirectUrl },
   { name: "JWT_SECRET", read: () => readSecret("JWT_SECRET") },
+  { name: "NEXTAUTH_SECRET", read: () => readSecret("NEXTAUTH_SECRET") },
 ];
 
 const OPTIONAL_BUT_RECOMMENDED = [
+  {
+    name: "NEXT_PUBLIC_APP_URL",
+    read: () =>
+      readSecret("NEXT_PUBLIC_APP_URL") ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null),
+  },
+  { name: "MONGODB_URI", read: getMongoUri },
   { name: "OPENAI_API_KEY", read: getOpenAIKey },
-  { name: "NEXTAUTH_SECRET", read: () => readSecret("NEXTAUTH_SECRET") },
   {
     name: "GOOGLE_CLIENT_ID",
     read: () =>
@@ -326,7 +390,6 @@ const OPTIONAL_BUT_RECOMMENDED = [
     read: getPostHogKey,
   },
   { name: "PINECONE_API_KEY", read: () => (isPineconeConfigured() ? getPineconeApiKey() : null) },
-  { name: "LEONARDO_API_KEY", read: getLeonardoApiKey },
   {
     name: "LIVEBLOCKS_SECRET_KEY",
     read: () => (isLiveblocksConfigured() ? getLiveblocksSecretKey() : null),
@@ -372,6 +435,12 @@ export function assertServerEnv(): EnvReport {
     for (const w of warnings) {
       // eslint-disable-next-line no-console
       console.warn(`  WARN   ${w}`);
+    }
+    if (process.env.VERCEL === "1" && !isCloudinaryConfigured()) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        "  WARN   CLOUDINARY_* not set — PDF/thumbnail exports use ephemeral disk on Vercel and will not persist"
+      );
     }
   }
 

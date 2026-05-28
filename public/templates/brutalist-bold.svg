@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+
+      <rect width="595" height="842" fill="#ffffff"/>
+      <rect x="32" y="32" width="531" height="80" fill="#000000"/>
+      <text x="48" y="86" font-family="Arial Black,sans-serif" font-size="36" font-weight="900" fill="#eab308">SOPHIA</text>
+      <rect x="32" y="130" width="8" height="200" fill="#000000"/>
+      <text x="56" y="160" font-family="Arial,sans-serif" font-size="14" font-weight="700" fill="#000">EXPERIENCE</text>
+      <text x="56" y="188" font-family="Arial,sans-serif" font-size="12" fill="#404040">GOOGLE / SPOTIFY</text>
+      <rect x="32" y="360" width="531" height="4" fill="#eab308"/>
+    
+</svg>

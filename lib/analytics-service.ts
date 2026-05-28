@@ -1,4 +1,6 @@
 import { getDatabase } from "@/lib/mongodb";
+import { isMongoCircuitOpen } from "@/lib/db-circuit";
+import { isMongoConfigured } from "@/lib/env";
 import { listUserCVs, getCVById } from "@/lib/cv-service";
 import { findSaasUserByEmail } from "@/lib/saas-user";
 import { computeAtsScore } from "@/lib/ats-score";
@@ -30,16 +32,18 @@ export async function getUserAnalytics(email: string, range: DateRangeKey = "7d"
   }[] = [];
 
   try {
-    const db = await getDatabase();
-    interactions = (await db
-      .collection("interactions")
-      .find({
-        userEmail: cleanEmail,
-        timestamp: { $gte: start, $lte: end },
-      })
-      .sort({ timestamp: -1 })
-      .limit(200)
-      .toArray()) as unknown as typeof interactions;
+    if (isMongoConfigured() && !isMongoCircuitOpen()) {
+      const db = await getDatabase();
+      interactions = (await db
+        .collection("interactions")
+        .find({
+          userEmail: cleanEmail,
+          timestamp: { $gte: start, $lte: end },
+        })
+        .sort({ timestamp: -1 })
+        .limit(200)
+        .toArray()) as unknown as typeof interactions;
+    }
   } catch {
     /* Mongo optional */
   }

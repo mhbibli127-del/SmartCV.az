@@ -38,6 +38,9 @@
   ],
   "exclude": [
     "node_modules",
-    ".next"
+    ".next",
+    "coverage",
+    "dist",
+    ".cache"
   ]
 }

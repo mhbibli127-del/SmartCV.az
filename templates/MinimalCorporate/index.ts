@@ -1,0 +1,1 @@
+export { buildMinimalCorporate } from "./build";

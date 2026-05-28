@@ -1,12 +1,10 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import AccountLayout from "@/components/account/AccountLayout";
 import ProfileSection from "@/components/account/ProfileSection";
 import SecuritySection from "@/components/account/SecuritySection";
 import NotificationSection from "@/components/account/NotificationSection";
-import BillingSection from "@/components/account/BillingSection";
 import AIPreferencesSection from "@/components/account/AIPreferencesSection";
 import DataPrivacySection from "@/components/account/DataPrivacySection";
 import type {
@@ -15,10 +13,8 @@ import type {
   NotificationPrefs,
   UserProfile,
 } from "@/components/account/types";
-import { useSubscription } from "@/hooks/useSubscription";
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api-client";
-import { useAnalytics } from "@/lib/analytics";
 
 const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
   email: true,
@@ -49,10 +45,7 @@ function loadStoredPrefs<T>(key: string, fallback: T): T {
 }
 
 function AccountPageContent() {
-  const searchParams = useSearchParams();
   const { success, error: toastError } = useToast();
-  const { refreshSubscription } = useSubscription();
-  const { trackPageView, trackSubscriptionUpgrade } = useAnalytics();
   const [activeSection, setActiveSection] = useState<AccountSectionId>("profile");
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -66,29 +59,6 @@ function AccountPageContent() {
   const [savedProfile, setSavedProfile] = useState(profile);
   const [notifications, setNotifications] = useState<NotificationPrefs>(DEFAULT_NOTIFICATIONS);
   const [aiPrefs, setAiPrefs] = useState<AiPreferences>(DEFAULT_AI_PREFS);
-
-  useEffect(() => {
-    trackPageView("/dashboard/account");
-  }, [trackPageView]);
-
-  useEffect(() => {
-    const checkout = searchParams.get("checkout");
-    const sessionId = searchParams.get("session_id");
-    if (checkout === "success" && sessionId) {
-      refreshSubscription().then(() => {
-        trackSubscriptionUpgrade({
-          fromPlan: "free",
-          toPlan: "paid",
-          provider: "paddle",
-          page: "/dashboard/account",
-        });
-        success(
-          "Payment successful",
-          "Your subscription is active. It may take a few seconds to sync."
-        );
-      });
-    }
-  }, [searchParams, refreshSubscription, success, trackSubscriptionUpgrade]);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -129,8 +99,12 @@ function AccountPageContent() {
     if (typeof window === "undefined") return;
     const storedEmail =
       localStorage.getItem("user_email") ||
-      localStorage.getItem("auth_email") ||
-      profile.email;
+      localStorage.getItem("auth_email");
+    if (!storedEmail) {
+      setNotifications(loadStoredPrefs("smartcv_notifications", DEFAULT_NOTIFICATIONS));
+      setAiPrefs(loadStoredPrefs("smartcv_ai_prefs", DEFAULT_AI_PREFS));
+      return;
+    }
     const email = storedEmail.toLowerCase().trim();
     const namePart = email.split("@")[0] || "user";
     const formattedName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
@@ -207,8 +181,6 @@ function AccountPageContent() {
             onSave={handleNotificationsSave}
           />
         );
-      case "billing":
-        return <BillingSection />;
       case "ai":
         return (
           <AIPreferencesSection prefs={aiPrefs} onChange={setAiPrefs} onSave={handleAiPrefsSave} />

@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useCallback, useState } from "react";
+import Image from "next/image";
 import { Loader2, Sparkles, Wand2 } from "lucide-react";
 import { LEONARDO_PRESETS } from "@/lib/ai/leonardo/presets";
 import type { LeonardoPresetId } from "@/lib/ai/leonardo/types";
@@ -109,11 +110,16 @@ function AIImagePanelInner({ cvId, className }: AIImagePanelProps) {
       </button>
       {error && <p className="text-xs text-red-600">{error}</p>}
       {previewUrl && (
-        <img
-          src={previewUrl}
-          alt="AI generated preview"
-          className="w-full rounded-lg border border-zinc-200 object-cover"
-        />
+        <div className="relative aspect-video w-full overflow-hidden rounded-lg border border-zinc-200">
+          <Image
+            src={previewUrl}
+            alt="AI generated preview"
+            fill
+            sizes="(max-width: 768px) 100vw, 320px"
+            unoptimized
+            className="object-cover"
+          />
+        </div>
       )}
     </div>
   );

@@ -6,14 +6,16 @@ import type { KonvaEventObject } from "konva/lib/Node";
 import type { EditorElement } from "@/types/cv-document";
 import { useEditorStore } from "@/lib/editor-store";
 import { clampElement, computeAlignmentSnap } from "@/lib/layout-engine";
+import { isPlaceholderContent } from "@/lib/section-styles";
 
 type Props = {
   element: EditorElement;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  disableDrag?: boolean;
 };
 
-function TextElementInner({ element, isSelected, onSelect }: Props) {
+function TextElementInner({ element, isSelected, onSelect, disableDrag }: Props) {
   const elements = useEditorStore((s) => s.elements);
   const snapEnabled = useEditorStore((s) => s.snapEnabled);
   const setAlignmentGuides = useEditorStore((s) => s.setAlignmentGuides);
@@ -60,9 +62,15 @@ function TextElementInner({ element, isSelected, onSelect }: Props) {
       y={element.y}
       width={element.width}
       height={element.height}
-      draggable={!element.locked}
-      onClick={() => onSelect(element.id)}
-      onTap={() => onSelect(element.id)}
+      draggable={!element.locked && !disableDrag}
+      onClick={() => {
+        onSelect(element.id);
+        if (isSelected && !element.locked) setEditingId(element.id);
+      }}
+      onTap={() => {
+        onSelect(element.id);
+        if (isSelected && !element.locked) setEditingId(element.id);
+      }}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
       onDragStart={() => onSelect(element.id)}
@@ -90,11 +98,25 @@ function TextElementInner({ element, isSelected, onSelect }: Props) {
       <Text
         width={element.width}
         height={element.height}
-        text={element.text ?? ""}
+        text={
+          isPlaceholderContent(element.text) ? "Click to edit" : (element.text ?? "")
+        }
         fontSize={element.fontSize ?? 13}
         fontFamily={element.fontFamily ?? "Inter"}
-        fill={element.fill ?? "#18181b"}
-        fontStyle={element.fontWeight === "bold" ? "bold" : "normal"}
+        fill={
+          isPlaceholderContent(element.text)
+            ? "#a1a1aa"
+            : (element.fill ?? "#18181b")
+        }
+        fontStyle={
+          isPlaceholderContent(element.text)
+            ? "italic"
+            : element.fontWeight === "bold"
+              ? "bold"
+              : "normal"
+        }
+        lineHeight={element.lineHeight}
+        letterSpacing={element.letterSpacing}
         wrap="word"
         listening={false}
       />

@@ -2,26 +2,18 @@ import "./globals.css";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Toaster } from "@/components/ui/toaster";
-import UpgradeModal from "@/components/UpgradeModal";
 import { AppProviders } from "@/app/providers";
-import { inter } from "@/lib/fonts";
+import { inter, studioFontVariables } from "@/lib/fonts";
+import { rootMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
-  title: "SmartCV.AZ",
-  description: "AI-powered CV builder and resume analyzer",
-  icons: {
-    icon: [{ url: "/brand/logo-mark.svg", type: "image/svg+xml" }],
-    apple: "/brand/logo-mark.svg",
-  },
-};
+export const metadata: Metadata = rootMetadata;
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="az" className={inter.variable}>
+    <html lang="az" className={`${inter.variable} ${studioFontVariables}`}>
       <body className={inter.className}>
         <AppProviders>
           {children}
-          <UpgradeModal />
           <Toaster />
         </AppProviders>
       </body>

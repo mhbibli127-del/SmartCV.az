@@ -7,11 +7,11 @@ import { Download, RefreshCw, Wand2, Palette, FormInput, Save, Check, ArrowUpRig
 import { generatePDF } from '@/lib/pdfGenerator';
 import { useToast } from '@/components/ui/use-toast';
 import { api } from '@/lib/api-client';
-import { useSubscription } from '@/hooks/useSubscription';
-import { useAnalytics } from '@/lib/analytics';
 import { PageShell, PageHeader, Surface } from '@/components/ui/page-shell';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { PdfImportDropzone } from '@/components/pdf/PdfImportDropzone';
+import type { PdfImportPayload } from '@/types/pdf-import';
 
 export default function CVGeneratorPage() {
   const [step, setStep] = useState<number>(1);
@@ -24,12 +24,6 @@ export default function CVGeneratorPage() {
   const [autoSaving, setAutoSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
   const { success, error: toastError } = useToast();
-  const { incrementAI, incrementCV, openUpgradeModal, refreshSubscription } = useSubscription();
-  const { trackPageView } = useAnalytics();
-
-  useEffect(() => {
-    trackPageView('/dashboard/generator');
-  }, [trackPageView]);
 
   useEffect(() => {
     const templateData = localStorage.getItem('selectedTemplateData');
@@ -68,9 +62,6 @@ export default function CVGeneratorPage() {
   };
 
   const handleFormSubmit = async (formData: any) => {
-    if (!incrementAI()) return;
-    if (!incrementCV()) return;
-
     setLoading(true);
     setError('');
     
@@ -84,9 +75,6 @@ export default function CVGeneratorPage() {
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        if (response.status === 403 && errData.code === 'AI_LIMIT_REACHED') {
-          openUpgradeModal();
-        }
         throw new Error(errData.error || 'Failed to generate CV');
       }
 
@@ -106,7 +94,6 @@ export default function CVGeneratorPage() {
         },
       });
       success('Resume completed', 'Your AI-generated CV is ready.');
-      await refreshSubscription();
       
       setStep(3);
     } catch (err) {
@@ -136,14 +123,9 @@ export default function CVGeneratorPage() {
       });
 
       if (ok) {
-        refreshSubscription();
         if (data?.cvId) setSavedCvId(String(data.cvId));
       } else if (status === 403 && data?.code === 'CV_LIMIT_REACHED') {
-        toastError(
-          'Free plan limit reached',
-          data.error || 'Upgrade to Pro to save more CVs.'
-        );
-        openUpgradeModal();
+        toastError('Limit reached', data.error || 'Could not save your CV.');
       } else {
         console.error('Failed to save CV to database', data);
         toastError('Save failed', data?.error || 'Could not save your CV.');
@@ -176,6 +158,16 @@ export default function CVGeneratorPage() {
   const handleRegenerate = async () => {
     if (generatedCV) {
       setStep(2);
+    }
+  };
+
+  const handlePdfImported = (data: PdfImportPayload) => {
+    setPreFilledData(data);
+    if (config.templateId) {
+      setStep(2);
+      success('PDF imported', 'Your details were pre-filled — review and generate.');
+    } else {
+      success('PDF imported', 'Pick a template next, then review your details.');
     }
   };
 
@@ -219,6 +211,15 @@ export default function CVGeneratorPage() {
           </React.Fragment>
         ))}
       </div>
+
+      <Surface padding className="max-w-2xl mx-auto">
+        <PdfImportDropzone
+          compact
+          label="Already have a CV? Import PDF to pre-fill"
+          onImported={handlePdfImported}
+          onError={(msg) => toastError('Import failed', msg)}
+        />
+      </Surface>
 
       {step === 1 && <TemplateCatalog onSelect={handleTemplateSelect} />}
 

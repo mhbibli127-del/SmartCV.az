@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595 842" width="595" height="842">
+
+      <rect width="595" height="842" fill="#ffffff"/>
+      <rect x="0" y="0" width="595" height="100" fill="#2563eb"/>
+      <text x="48" y="64" font-family="Inter,sans-serif" font-size="28" font-weight="800" fill="#ffffff">Sophia Bennett</text>
+      <rect x="48" y="130" width="120" height="36" rx="18" fill="#f97316"/>
+      <text x="68" y="153" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#fff">Figma</text>
+      <rect x="180" y="130" width="120" height="36" rx="18" fill="#2563eb"/>
+      <text x="200" y="153" font-family="Inter,sans-serif" font-size="11" font-weight="600" fill="#fff">React</text>
+    
+</svg>

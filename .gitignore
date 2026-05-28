@@ -1,4 +1,5 @@
 node_modules
+node.exe
 .next
 out
 build
@@ -10,6 +11,8 @@ build
 .turbo
 dist
 .cache
+coverage
+tsconfig.tsbuildinfo
 
 # Sentry Config File
 .env.sentry-build-plugin

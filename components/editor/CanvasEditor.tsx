@@ -7,6 +7,8 @@ import { ElementLayer } from "./ElementLayer";
 import { AlignmentGuides } from "./AlignmentGuides";
 import { SelectionTransformer } from "./SelectionTransformer";
 import { InlineTextEditor } from "./InlineTextEditor";
+import { StudioResizeOverlay } from "@/components/studio/StudioResizeOverlay";
+import { StudioElementToolbar } from "@/components/studio/StudioElementToolbar";
 import { useEditorStore } from "@/lib/editor-store";
 import { useDesignStore } from "@/lib/design-store";
 import { A4_HEIGHT, A4_WIDTH, CANVAS_PADDING, GRID_SIZE } from "@/lib/layout-engine";
@@ -15,16 +17,29 @@ import { useEditorKeyboardShortcuts } from "./useEditorKeyboardShortcuts";
 
 export type CanvasEditorHandle = {
   exportPng: () => string | null;
+  getPaperElement: () => HTMLElement | null;
+  preparePage: (page: number) => Promise<void>;
+  getPageCount: () => number;
 };
 
-function CanvasEditorInner(_props: object, ref: React.Ref<CanvasEditorHandle>) {
+interface CanvasEditorProps {
+  embedded?: boolean;
+  zoom?: number;
+}
+
+function CanvasEditorInner(
+  { embedded = false, zoom = 1 }: CanvasEditorProps,
+  ref: React.Ref<CanvasEditorHandle>
+) {
   useEditorKeyboardShortcuts();
   const stageRef = useRef<Konva.Stage>(null);
+  const paperRef = useRef<HTMLDivElement>(null);
   const elementsLayerRef = useRef<Konva.Layer>(null);
   const elements = useEditorStore((s) => s.elements);
   const selectedId = useEditorStore((s) => s.selectedId);
   const selectElement = useEditorStore((s) => s.selectElement);
   const clearAlignmentGuides = useEditorStore((s) => s.clearAlignmentGuides);
+  const isExporting = useEditorStore((s) => s.isExporting);
   const activeTheme = useDesignStore((s) => s.activeTheme);
   const pageFill = themeToCanvasBackground(activeTheme);
   const gridFill =
@@ -42,30 +57,31 @@ function CanvasEditorInner(_props: object, ref: React.Ref<CanvasEditorHandle>) {
 
   useImperativeHandle(ref, () => ({
     exportPng: () => stageRef.current?.toDataURL({ pixelRatio: 2 }) ?? null,
+    getPaperElement: () => paperRef.current,
+    preparePage: async (page: number) => {
+      useEditorStore.getState().setActivePage(page);
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+    },
+    getPageCount: () => useEditorStore.getState().pageCount,
   }));
 
-  return (
+  const paper = (
     <div
-      className="flex flex-1 items-start justify-center overflow-auto rounded-[14px] border border-black/[0.08] p-6 transition-colors duration-300"
+      ref={paperRef}
+      data-export-paper
+      className={embedded ? "relative" : "relative shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300"}
       style={{
-        background:
-          activeTheme.mode === "dark"
-            ? "linear-gradient(180deg, #18181b 0%, #09090b 100%)"
-            : "rgba(244,244,245,0.8)",
+        width: A4_WIDTH,
+        height: A4_HEIGHT,
+        boxShadow:
+          !embedded && activeTheme.effects.shadowDepth === "lift"
+            ? "0 24px 48px rgba(0,0,0,0.18)"
+            : undefined,
       }}
     >
-      <div
-        className="relative shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300"
-        style={{
-          width: A4_WIDTH,
-          height: A4_HEIGHT,
-          boxShadow:
-            activeTheme.effects.shadowDepth === "lift"
-              ? "0 24px 48px rgba(0,0,0,0.18)"
-              : undefined,
-        }}
-      >
-        <Stage
+      <Stage
           ref={stageRef}
           width={A4_WIDTH}
           height={A4_HEIGHT}
@@ -110,6 +126,7 @@ function CanvasEditorInner(_props: object, ref: React.Ref<CanvasEditorHandle>) {
               elements={elements}
               selectedId={selectedId}
               onSelect={selectElement}
+              disableDrag={embedded}
             />
           </Layer>
 
@@ -117,12 +134,35 @@ function CanvasEditorInner(_props: object, ref: React.Ref<CanvasEditorHandle>) {
             <AlignmentGuides />
           </Layer>
 
-          <Layer>
-            <SelectionTransformer layerRef={elementsLayerRef} />
-          </Layer>
+          {!embedded && (
+            <Layer>
+              <SelectionTransformer layerRef={elementsLayerRef} />
+            </Layer>
+          )}
         </Stage>
-        <InlineTextEditor stageRef={stageRef} />
-      </div>
+        {embedded && !isExporting && (
+          <div className="pointer-events-none absolute inset-0 z-10">
+            <StudioElementToolbar zoom={zoom} />
+            <StudioResizeOverlay zoom={zoom} />
+          </div>
+        )}
+        {!isExporting && <InlineTextEditor stageRef={stageRef} />}
+    </div>
+  );
+
+  if (embedded) return paper;
+
+  return (
+    <div
+      className="flex flex-1 items-start justify-center overflow-auto rounded-[14px] border border-black/[0.08] p-6 transition-colors duration-300"
+      style={{
+        background:
+          activeTheme.mode === "dark"
+            ? "linear-gradient(180deg, #18181b 0%, #09090b 100%)"
+            : "rgba(244,244,245,0.8)",
+      }}
+    >
+      {paper}
     </div>
   );
 }

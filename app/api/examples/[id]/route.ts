@@ -1,23 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCVExampleBySlug, getCVExampleById } from "@/lib/cv-examples/database";
+import { getPublishedResumeById } from "@/lib/resume-service";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/examples/[id] — full CV profile for builder import */
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  const key = params.id;
-  const example =
-    getCVExampleBySlug(key) ?? getCVExampleById(key);
+type RouteParams = { params: { id: string } };
 
-  if (!example) {
-    return NextResponse.json(
-      { error: "Example not found", fallback: true },
-      { status: 404 }
-    );
+export async function GET(_req: NextRequest, { params }: RouteParams) {
+  try {
+    const resume = await getPublishedResumeById(params.id);
+    if (!resume) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({ resume });
+  } catch (err) {
+    console.error("[api/examples/id]", err);
+    return NextResponse.json({ error: "Failed to load resume" }, { status: 500 });
   }
-
-  return NextResponse.json({ example });
 }

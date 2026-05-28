@@ -41,7 +41,7 @@ export default function PaddleCheckoutButton({
   const { error: toastError } = useToast();
 
   const clientToken = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN ?? "";
-  const paddleEnv = process.env.NEXT_PUBLIC_PADDLE_ENV ?? process.env.PADDLE_ENV ?? "sandbox";
+  const paddleEnv = process.env.NEXT_PUBLIC_PADDLE_ENV ?? "sandbox";
 
   useEffect(() => {
     if (window.Paddle && clientToken) {

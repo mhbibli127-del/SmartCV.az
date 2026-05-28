@@ -11,9 +11,10 @@ type Props = {
   element: EditorElement;
   isSelected: boolean;
   onSelect: (id: string) => void;
+  disableDrag?: boolean;
 };
 
-function DividerElementInner({ element, isSelected, onSelect }: Props) {
+function DividerElementInner({ element, isSelected, onSelect, disableDrag }: Props) {
   const elements = useEditorStore((s) => s.elements);
   const snapEnabled = useEditorStore((s) => s.snapEnabled);
   const setAlignmentGuides = useEditorStore((s) => s.setAlignmentGuides);
@@ -56,7 +57,7 @@ function DividerElementInner({ element, isSelected, onSelect }: Props) {
       y={element.y}
       width={element.width}
       height={element.height}
-      draggable={!element.locked}
+      draggable={!element.locked && !disableDrag}
       onClick={() => onSelect(element.id)}
       onTap={() => onSelect(element.id)}
       onDragMove={handleDragMove}

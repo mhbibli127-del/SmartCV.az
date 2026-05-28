@@ -1,5 +1,12 @@
 import Link from "next/link";
 import BrandLogo from "@/components/BrandLogo";
+import { createPageMetadata } from "@/lib/seo/metadata";
+
+export const metadata = createPageMetadata({
+  title: "SmartCV.AZ",
+  description: "AI-powered CV builder and resume analyzer for modern job seekers.",
+  path: "/",
+});
 
 export default function HomePage() {
   return (
@@ -8,9 +15,6 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <BrandLogo href="/" showTagline={false} size="md" />
           <nav className="flex items-center gap-6 text-sm font-medium text-gray-700">
-            <Link href="/pricing" className="hover:text-gray-900">
-              Pricing
-            </Link>
             <Link
               href="/login"
               className="rounded-xl bg-gray-900 px-4 py-2 text-white shadow-sm hover:bg-gray-800"
@@ -52,10 +56,10 @@ export default function HomePage() {
                     Get Started
                   </Link>
                   <Link
-                    href="/pricing"
+                    href="/dashboard"
                     className="inline-flex justify-center rounded-xl border border-gray-200 bg-white px-6 py-3 text-base font-semibold text-gray-900 shadow-sm hover:bg-gray-50"
                   >
-                    View Pricing
+                    Open Dashboard
                   </Link>
                 </div>
 
@@ -79,7 +83,7 @@ export default function HomePage() {
                       <p className="mt-1 text-sm text-gray-600">Ready to tailor for your next role</p>
                     </div>
                     <div className="rounded-2xl bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm">
-                      Pro included
+                      Free forever
                     </div>
                   </div>
 
@@ -205,16 +209,18 @@ export default function HomePage() {
           <div className="mt-14 rounded-3xl border border-gray-200 bg-white p-8 shadow-sm">
             <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-sm font-semibold text-gray-900">Upgrade when you’re ready</p>
-                <h3 className="mt-2 text-2xl font-semibold text-gray-900">Pro unlocks unlimited exports & optimization</h3>
-                <p className="mt-2 text-sm text-gray-600">Start with Free (up to 5 CVs). Cancel anytime.</p>
+                <p className="text-sm font-semibold text-gray-900">Ready to build your CV?</p>
+                <h3 className="mt-2 text-2xl font-semibold text-gray-900">
+                  Professional templates, AI tools, and PDF export
+                </h3>
+                <p className="mt-2 text-sm text-gray-600">Free CV builder — no credit card required.</p>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
-                  href="/pricing"
+                  href="/login"
                   className="rounded-xl bg-gray-900 px-6 py-3 text-center text-sm font-semibold text-white shadow-sm hover:bg-gray-800"
                 >
-                  See Pricing
+                  Get Started
                 </Link>
                 <Link
                   href="/dashboard"
@@ -235,9 +241,6 @@ export default function HomePage() {
                 <p className="mt-1">Built for professionals • Career-focused tools</p>
               </div>
               <div className="flex flex-wrap gap-4 text-sm font-medium">
-                <Link href="/pricing" className="text-gray-600 hover:text-gray-900">
-                  Pricing
-                </Link>
                 <Link href="/login" className="text-gray-600 hover:text-gray-900">
                   Log in
                 </Link>

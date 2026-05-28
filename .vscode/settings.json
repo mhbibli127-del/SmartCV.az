@@ -21,18 +21,32 @@
     "**/.DS_Store": true,
     "**/Thumbs.db": true,
     "node_modules/": true,
-    ".next/": true
+    ".next/": true,
+    "coverage/": true,
+    "dist/": true,
+    ".cache/": true,
+    ".turbo/": true,
+    "tsconfig.tsbuildinfo": true
   },
   "search.exclude": {
     "**/node_modules": true,
     "**/.next": true,
     "**/dist": true,
-    "**/build": true
+    "**/build": true,
+    "**/coverage": true,
+    "**/.cache": true,
+    "**/.turbo": true,
+    "**/tsconfig.tsbuildinfo": true
   },
   "files.watcherExclude": {
     "**/node_modules/**": true,
     "**/.next/**": true,
     "**/dist/**": true,
-    "**/build/**": true
-  }
+    "**/build/**": true,
+    "**/coverage/**": true,
+    "**/.cache/**": true,
+    "**/.turbo/**": true,
+    "**/tsconfig.tsbuildinfo": true
+  },
+  "typescript.tsserver.maxTsServerMemory": 2048
 }

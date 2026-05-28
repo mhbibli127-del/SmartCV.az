@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 import { connectDB, getMongoConnectionState, pingDatabase } from "@/lib/mongodb";
 import { maskMongoUri, requireMongoUri } from "@/lib/env";
+import { blockInProduction, handleApiError } from "@/lib/api-errors";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const blocked = blockInProduction();
+  if (blocked) return blocked;
+
   try {
     const uri = requireMongoUri();
     // eslint-disable-next-line no-console
@@ -21,9 +25,6 @@ export async function GET() {
       readyState: state.readyState,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Connection failed";
-    // eslint-disable-next-line no-console
-    console.error("[mongo-test]", message);
-    return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    return handleApiError(err, "mongo-test", "MongoDB connection failed");
   }
 }

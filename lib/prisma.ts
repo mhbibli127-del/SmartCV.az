@@ -2,35 +2,36 @@ import { PrismaClient } from "@prisma/client";
 import { getDatabaseUrl } from "@/lib/env";
 import { isBuildPhase } from "@/lib/build";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var prisma: PrismaClient | undefined;
-}
+const globalForPrisma = globalThis as typeof globalThis & {
+  prisma?: PrismaClient;
+};
 
 function createPrismaClient(): PrismaClient {
   return new PrismaClient({
     datasources: {
       db: { url: getDatabaseUrl() },
     },
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["error", "warn"]
+        : ["error"],
   });
 }
 
 /**
- * Lazy Prisma singleton.
- * During Next.js static build we return a client instance without connecting;
- * first real query happens at request time on Vercel/local runtime.
+ * Singleton Prisma client — cached on globalThis in dev AND production.
+ * Prevents hot-reload duplication locally and reuse within warm serverless instances.
  */
 function getPrismaClient(): PrismaClient {
-  if (global.prisma) return global.prisma;
+  if (globalForPrisma.prisma) {
+    return globalForPrisma.prisma;
+  }
 
   const client = createPrismaClient();
-  if (process.env.NODE_ENV !== "production") {
-    global.prisma = client;
-  }
+  globalForPrisma.prisma = client;
   return client;
 }
 
-// During build, export a lightweight client (no eager $connect).
 const prisma = isBuildPhase() ? createPrismaClient() : getPrismaClient();
 
 export default prisma;
