@@ -9,31 +9,17 @@ export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await parseJsonBody<{
-      fullName?: string;
-      email?: string;
-      phone?: string;
-      location?: string;
-      website?: string;
-      title?: string;
-      rawExperience?: string;
-      rawEducation?: string;
-      rawSkills?: string;
-      targetIndustry?: string;
-    }>(req);
-
-    const {
-      fullName = "",
-      email = "",
-      phone = "",
-      location = "",
-      website = "",
-      title = "",
-      rawExperience = "",
-      rawEducation = "",
-      rawSkills = "",
-      targetIndustry = "",
-    } = body;
+    const body = await parseJsonBody(req);
+    const fullName = String(body.fullName ?? "");
+    const email = String(body.email ?? "");
+    const phone = String(body.phone ?? "");
+    const location = String(body.location ?? "");
+    const website = String(body.website ?? "");
+    const title = String(body.title ?? "");
+    const rawExperience = String(body.rawExperience ?? "");
+    const rawEducation = String(body.rawEducation ?? "");
+    const rawSkills = String(body.rawSkills ?? "");
+    const targetIndustry = String(body.targetIndustry ?? "");
 
     const user = await getAuthenticatedUser(req);
 

@@ -56,23 +56,25 @@ export async function POST(
       return unauthorized();
     }
 
-    const body = await parseJsonBody<{
-      action?: "sync" | "presence";
-      presence?: CollabPresence;
-      elements?: EditorElement[];
-      version?: number;
-    }>(req);
+    const body = await parseJsonBody(req);
     const action = body.action;
 
     if (action === "presence") {
-      const presence = body.presence;
-      if (!presence) {
+      const presenceRaw = body.presence;
+      if (!presenceRaw || typeof presenceRaw !== "object" || Array.isArray(presenceRaw)) {
         return NextResponse.json({ error: "presence required" }, { status: 400 });
       }
+      const presence = presenceRaw as Partial<CollabPresence>;
       const session = updateCollabPresence(params.cvId, {
         ...presence,
         userId: user.email,
-        name: presence.name ?? user.name ?? user.email.split("@")[0] ?? "User",
+        name:
+          (typeof presence.name === "string" ? presence.name : null) ??
+          user.name ??
+          user.email.split("@")[0] ??
+          "User",
+        color: typeof presence.color === "string" ? presence.color : "#6366f1",
+        updatedAt: Date.now(),
       });
       return NextResponse.json({
         ok: true,

@@ -36,12 +36,19 @@ export function safeRoute(
   };
 }
 
-export async function parseJsonBody<T extends Record<string, unknown>>(
-  req: NextRequest
-): Promise<T> {
+type JsonRequest = Pick<NextRequest, "json">;
+
+/** Safe JSON parse — returns `{}` on invalid/missing body (never throws). */
+export async function parseJsonBody(
+  req: JsonRequest
+): Promise<Record<string, unknown>> {
   try {
-    return (await req.json()) as T;
+    const data = await req.json();
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      return data as Record<string, unknown>;
+    }
+    return {};
   } catch {
-    return {} as T;
+    return {};
   }
 }

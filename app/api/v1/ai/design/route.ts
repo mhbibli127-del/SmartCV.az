@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getAuthenticatedUser } from "@/lib/session";
 import { analyzeDesign, autoFixDesign } from "@/lib/enterprise/ai/design-intelligence";
 import type { EditorElement } from "@/types/cv-document";
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
+    const body = await parseJsonBody(req);
     const elements = (body.elements ?? []) as EditorElement[];
     const autoFix = Boolean(body.autoFix);
 

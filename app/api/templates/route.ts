@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getServerSession } from "next-auth";
 import { getAuthOptions } from "@/lib/auth-options";
 import { DatabaseOperations } from "@/lib/models";
@@ -102,9 +103,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { templateId, action, elementType, page, metadata } = await req.json();
+    const body = await parseJsonBody(req);
+    const templateId = body.templateId;
+    const action = typeof body.action === "string" ? body.action : "";
+    const elementType = typeof body.elementType === "string" ? body.elementType : undefined;
+    const page = typeof body.page === "string" ? body.page : undefined;
+    const metadata =
+      body.metadata && typeof body.metadata === "object" && !Array.isArray(body.metadata)
+        ? (body.metadata as Record<string, unknown>)
+        : undefined;
 
-    if (!templateId || !action) {
+    if (templateId == null || !action) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -114,16 +123,16 @@ export async function POST(req: NextRequest) {
         userEmail: session.user.email,
         action,
         elementType: elementType || "template",
-        elementId: templateId.toString(),
+        elementId: String(templateId),
         page: page || "/dashboard/examples",
         metadata,
       });
 
       if (action === "view" || action === "download") {
-        await DatabaseOperations.updateTemplateStats(templateId, action);
+        await DatabaseOperations.updateTemplateStats(Number(templateId), action);
       }
 
-      const template = await DatabaseOperations.getTemplateById(templateId);
+      const template = await DatabaseOperations.getTemplateById(Number(templateId));
       const cleanTemplate = template ? { ...template, _id: undefined } : null;
       return NextResponse.json({ success: true, stats: cleanTemplate });
     } catch {

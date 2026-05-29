@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getOpenAI } from "@/lib/openai";
 import { normalizeApply } from "@/lib/cv/cv-utils";
 
 export async function POST(req: NextRequest) {
   try {
     const openai = getOpenAI();
-    const body = await req.json();
+    const body = await parseJsonBody(req);
     const cv = body?.cv;
     const jobDescription = typeof body?.jobDescription === "string" ? body.jobDescription : "";
 

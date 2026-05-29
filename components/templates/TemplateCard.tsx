@@ -85,7 +85,7 @@ function TemplateCardInner({ template, onUse, onPreview }: TemplateCardProps) {
         </p>
         <p className="flex items-center gap-1 pt-1 text-[11px] text-zinc-400">
           <Type className="h-3 w-3" />
-          {template.fonts.heading}
+          {template.fonts?.heading ?? "Inter"}
         </p>
       </div>
     </motion.article>

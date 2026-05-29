@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getAuthenticatedUser } from "@/lib/session";
 import { changeUserPassword } from "@/lib/users";
 
@@ -11,7 +12,10 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { currentPassword, newPassword } = await req.json();
+    const body = await parseJsonBody(req);
+    const currentPassword =
+      typeof body.currentPassword === "string" ? body.currentPassword : "";
+    const newPassword = typeof body.newPassword === "string" ? body.newPassword : "";
     if (!currentPassword || !newPassword) {
       return NextResponse.json(
         { error: "Current and new password are required" },

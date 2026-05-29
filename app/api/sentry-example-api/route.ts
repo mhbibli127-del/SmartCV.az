@@ -1,5 +1,6 @@
+import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { blockInProduction } from "@/lib/api-errors";
+import { blockInProduction, handleApiError } from "@/lib/api-errors";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +12,19 @@ class SentryExampleAPIError extends Error {
 }
 
 /** Dev-only route to test Sentry error monitoring. */
-export function GET() {
-  const blocked = blockInProduction();
-  if (blocked) return blocked;
+export async function GET() {
+  try {
+    const blocked = blockInProduction();
+    if (blocked) return blocked;
 
-  Sentry.logger.info("Sentry example API called");
-  throw new SentryExampleAPIError(
-    "This error is raised on the backend called by the example page."
-  );
+    Sentry.logger.info("Sentry example API called");
+    throw new SentryExampleAPIError(
+      "This error is raised on the backend called by the example page."
+    );
+  } catch (err) {
+    if (err instanceof SentryExampleAPIError) {
+      throw err;
+    }
+    return handleApiError(err, "sentry-example GET", "Example route failed");
+  }
 }

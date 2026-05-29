@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getAuthenticatedUser } from "@/lib/session";
 import { getServerSession } from "next-auth";
 import { getAuthOptions } from "@/lib/auth-options";
@@ -53,7 +54,12 @@ export async function POST(req: NextRequest) {
       userEmail = auth?.email ?? "dev-user";
     }
 
-    const { eventType, data } = await req.json();
+    const body = await parseJsonBody(req);
+    const eventType = typeof body.eventType === "string" ? body.eventType : "";
+    const data =
+      body.data && typeof body.data === "object" && !Array.isArray(body.data)
+        ? (body.data as Record<string, unknown>)
+        : {};
     if (!eventType) {
       return NextResponse.json({ error: "Missing event type" }, { status: 400 });
     }
@@ -66,10 +72,10 @@ export async function POST(req: NextRequest) {
       userId: userEmail,
       userEmail,
       action: eventType,
-      elementType: data?.elementType || "unknown",
-      elementId: data?.elementId,
-      page: data?.page || "/",
-      metadata: data,
+      elementType: typeof data.elementType === "string" ? data.elementType : "unknown",
+      elementId: typeof data.elementId === "string" ? data.elementId : undefined,
+      page: typeof data.page === "string" ? data.page : "/",
+      metadata: data as Record<string, unknown>,
     });
 
     const today = parseDateRange("7d").start;

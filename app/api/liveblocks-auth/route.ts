@@ -21,8 +21,13 @@ export async function POST(req: NextRequest) {
       return unauthorized();
     }
 
-    const body = await parseJsonBody<{ cvId?: string; room?: string }>(req);
-    const cvId = typeof body.cvId === "string" ? body.cvId : body.room;
+    const body = await parseJsonBody(req);
+    const cvId =
+      typeof body.cvId === "string"
+        ? body.cvId
+        : typeof body.room === "string"
+          ? body.room
+          : undefined;
     if (!cvId) {
       return NextResponse.json({ error: "cvId required" }, { status: 400 });
     }

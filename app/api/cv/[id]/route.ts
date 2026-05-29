@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getAuthenticatedUser } from "@/lib/session";
 import {
   getCVById,
@@ -37,12 +38,20 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
+    const body = await parseJsonBody(req);
     const cv = await updateCVById(user.email, params.id, {
-      title: body.title,
-      templateId: body.templateId,
-      content: body.content ?? body.cvData,
-      status: body.status,
+      title: typeof body.title === "string" ? body.title : undefined,
+      templateId:
+        typeof body.templateId === "number"
+          ? body.templateId
+          : typeof body.templateId === "string"
+            ? Number(body.templateId)
+            : undefined,
+      content: (body.content ?? body.cvData) as Parameters<typeof updateCVById>[2]["content"],
+      status:
+        body.status === "completed" || body.status === "draft"
+          ? body.status
+          : undefined,
     });
 
     if (!cv) {

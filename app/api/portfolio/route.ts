@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getOpenAI } from "@/lib/openai";
 
 function safeParse(value: unknown) {
@@ -22,7 +23,7 @@ function stringArray(raw: unknown) {
 export async function POST(req: NextRequest) {
   try {
     const openai = getOpenAI();
-    const body = await req.json();
+    const body = await parseJsonBody(req);
     const cv = body?.cv;
 
     if (!cv) {

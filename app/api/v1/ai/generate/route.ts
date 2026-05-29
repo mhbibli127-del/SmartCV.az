@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { requireAiAccess, recordAiUsage, aiErrorResponse } from "@/lib/ai-route-guard";
 import { generateCV } from "@/lib/enterprise/ai/orchestrator";
 import { parseAIGenerateBody, TONE_STYLES, SOURCE_TYPES } from "@/lib/enterprise/validation/schemas";
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
   try {
     const email = await requireAiAccess(req);
 
-    const body = await req.json();
+    const body = await parseJsonBody(req);
     const parsed = parseAIGenerateBody(body);
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error }, { status: 400 });

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getLocalDb, saveLocalDb } from "@/lib/db";
 import { setUserVerified } from "@/lib/users";
 import { signSessionToken } from "@/lib/token";
@@ -13,7 +14,7 @@ const VERIFIED_SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 export async function POST(request: NextRequest) {
   try {
     const secure = cookieSecureFromRequest(request);
-    const { email: rawEmail, otp } = await request.json();
+    const { email: rawEmail, otp } = await parseJsonBody(request);
     const email = String(rawEmail ?? "")
       .trim()
       .toLowerCase();

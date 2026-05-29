@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { requireAiAccess, recordAiUsage, aiErrorResponse } from "@/lib/ai-route-guard";
 import { getOpenAI } from "@/lib/openai";
 import { analyzeDesign } from "@/lib/enterprise/ai/design-intelligence";
@@ -15,10 +16,14 @@ function sse(data: Record<string, unknown>): string {
 export async function POST(req: NextRequest) {
   try {
     const email = await requireAiAccess(req);
-    const body = await req.json();
+    const body = await parseJsonBody(req);
     const message = String(body.message ?? "").trim();
-    const summary = String(body.context?.summary ?? "").slice(0, 3000);
-    const elements = (body.context?.elements ?? []) as EditorElement[];
+    const context =
+      body.context && typeof body.context === "object" && !Array.isArray(body.context)
+        ? (body.context as Record<string, unknown>)
+        : {};
+    const summary = String(context.summary ?? "").slice(0, 3000);
+    const elements = (Array.isArray(context.elements) ? context.elements : []) as EditorElement[];
 
     if (!message) {
       return new Response(JSON.stringify({ error: "Message required" }), { status: 400 });

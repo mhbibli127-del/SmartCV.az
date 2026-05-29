@@ -89,7 +89,8 @@ const sentryBuildOptions = {
   project: process.env.SENTRY_PROJECT?.trim() || "javascript-nextjs",
   authToken: sentryAuthToken,
   ...(sentryRelease ? { release: { name: sentryRelease } } : {}),
-  silent: !isCi,
+  // Suppress "No auth token" / sourcemap upload noise when SENTRY_AUTH_TOKEN is unset
+  silent: !uploadSourceMaps,
   widenClientFileUpload: uploadSourceMaps,
   hideSourceMaps: true,
   tunnelRoute: "/monitoring",

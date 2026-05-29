@@ -32,73 +32,92 @@ function formatMongoCheck(
 }
 
 export async function GET() {
-  const checks: Record<string, string> = {
-    app: "ok",
-    timestamp: new Date().toISOString(),
-  };
-
   try {
-    const cache = getCache();
-    await cache.set("health:ping", "pong", 10);
-    const pong = await cache.get<string>("health:ping");
-    checks.cache = pong === "pong" ? "ok" : "degraded";
-  } catch {
-    checks.cache = "unavailable";
-  }
+    const checks: Record<string, string> = {
+      app: "ok",
+      timestamp: new Date().toISOString(),
+    };
 
-  try {
-    checks.queue = `ok (${getJobQueue().getPendingCount()} pending)`;
-  } catch {
-    checks.queue = "unavailable";
-  }
-
-  let dbHealth: Awaited<ReturnType<typeof getDatabaseHealth>> | null = null;
-
-  if (isPostgresConfigured()) {
-    if (isPrismaCircuitOpen()) {
-      checks.postgres = "circuit_open";
-    } else {
-      dbHealth ??= await getDatabaseHealth();
-      checks.postgres = formatPostgresCheck(
-        dbHealth.postgres,
-        dbHealth.postgresLatencyMs
-      );
+    try {
+      const cache = getCache();
+      await cache.set("health:ping", "pong", 10);
+      const pong = await cache.get<string>("health:ping");
+      checks.cache = pong === "pong" ? "ok" : "degraded";
+    } catch {
+      checks.cache = "unavailable";
     }
-  } else {
-    checks.postgres = "not configured";
-  }
 
-  if (isMongoConfigured()) {
-    if (isMongoCircuitOpen()) {
-      checks.mongodb = "circuit_open";
-    } else {
-      dbHealth ??= await getDatabaseHealth();
-      checks.mongodb = formatMongoCheck(dbHealth.mongo, dbHealth.mongoLatencyMs);
+    try {
+      checks.queue = `ok (${getJobQueue().getPendingCount()} pending)`;
+    } catch {
+      checks.queue = "unavailable";
     }
-  } else {
-    checks.mongodb = "not configured";
-  }
 
-  // Legacy key kept for existing monitors
-  checks.database = checks.postgres;
+    let dbHealth: Awaited<ReturnType<typeof getDatabaseHealth>> | null = null;
 
-  const coreOk =
-    checks.app === "ok" &&
-    (checks.postgres === "ok" ||
-      checks.postgres === "not configured" ||
-      checks.postgres === "circuit_open");
+    if (isPostgresConfigured()) {
+      if (isPrismaCircuitOpen()) {
+        checks.postgres = "circuit_open";
+      } else {
+        try {
+          dbHealth ??= await getDatabaseHealth();
+          checks.postgres = formatPostgresCheck(
+            dbHealth.postgres,
+            dbHealth.postgresLatencyMs
+          );
+        } catch {
+          checks.postgres = "error";
+        }
+      }
+    } else {
+      checks.postgres = "not configured";
+    }
 
-  const healthy = checks.cache !== "unavailable" && coreOk;
+    if (isMongoConfigured()) {
+      if (isMongoCircuitOpen()) {
+        checks.mongodb = "circuit_open";
+      } else {
+        try {
+          dbHealth ??= await getDatabaseHealth();
+          checks.mongodb = formatMongoCheck(dbHealth.mongo, dbHealth.mongoLatencyMs);
+        } catch {
+          checks.mongodb = "error";
+        }
+      }
+    } else {
+      checks.mongodb = "not configured";
+    }
 
-  return NextResponse.json(
-    {
-      status: healthy ? "ok" : "degraded",
-      checks,
-      circuits: {
-        postgres: isPrismaCircuitOpen(),
-        mongo: isMongoCircuitOpen(),
+    checks.database = checks.postgres;
+
+    const coreOk =
+      checks.app === "ok" &&
+      (checks.postgres === "ok" ||
+        checks.postgres === "not configured" ||
+        checks.postgres === "circuit_open");
+
+    const healthy = checks.cache !== "unavailable" && coreOk;
+
+    return NextResponse.json(
+      {
+        status: healthy ? "ok" : "degraded",
+        checks,
+        circuits: {
+          postgres: isPrismaCircuitOpen(),
+          mongo: isMongoCircuitOpen(),
+        },
       },
-    },
-    { status: healthy ? 200 : 503 }
-  );
+      { status: healthy ? 200 : 503 }
+    );
+  } catch (err) {
+    console.error("[health GET]", err);
+    return NextResponse.json(
+      {
+        status: "error",
+        checks: { app: "error" },
+        error: "Health check failed",
+      },
+      { status: 503 }
+    );
+  }
 }

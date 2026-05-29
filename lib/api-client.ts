@@ -22,7 +22,11 @@ export async function apiFetch<T = unknown>(
     let data: T;
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("application/json")) {
-      data = (await response.json()) as T;
+      try {
+        data = (await response.json()) as T;
+      } catch {
+        data = {} as T;
+      }
     } else {
       data = (await response.blob()) as T;
     }

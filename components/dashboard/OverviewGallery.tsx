@@ -31,17 +31,16 @@ function OverviewGalleryInner({ initialResumes, userName }: OverviewGalleryProps
   const { success, error: toastError } = useToast();
   const { user, loading: userLoading } = useCurrentUser();
 
-  const greeting = userLoading
-    ? "there"
-    : (user?.name ?? userName ?? "there").split(" ")[0];
+  const greetingName = user?.name ?? userName ?? "there";
+  const greeting = userLoading ? "there" : greetingName.split(" ")[0] ?? "there";
 
   const refreshResumes = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/resumes", { credentials: "include" });
       if (!res.ok) return;
-      const data = await res.json();
-      setResumes(Array.isArray(data.resumes) ? data.resumes : []);
+      const data = (await res.json().catch(() => ({}))) as { resumes?: unknown };
+      setResumes(Array.isArray(data?.resumes) ? data.resumes : []);
     } catch {
       /* keep current list */
     } finally {

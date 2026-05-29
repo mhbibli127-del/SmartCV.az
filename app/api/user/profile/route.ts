@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getAuthenticatedUser } from "@/lib/session";
 import { DatabaseOperations } from "@/lib/models";
 import prisma from "@/lib/prisma";
@@ -42,7 +43,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { name, email, phone, bio, avatar } = await req.json();
+    const body = await parseJsonBody(req);
+    const name = typeof body.name === "string" ? body.name : undefined;
+    const email = typeof body.email === "string" ? body.email : undefined;
+    const phone = typeof body.phone === "string" ? body.phone : undefined;
+    const bio = typeof body.bio === "string" ? body.bio : undefined;
+    const avatar = typeof body.avatar === "string" ? body.avatar : undefined;
     const cleanEmail = user.email.toLowerCase().trim();
 
     if (name) {

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { FileWarning, RefreshCw } from "lucide-react";
+import { captureExceptionSafe } from "@/lib/sentry/safe-capture";
 
 export default function DashboardError({
   error,
@@ -12,6 +13,7 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
+    captureExceptionSafe(error);
     console.error("[dashboard/error]", error);
   }, [error]);
 

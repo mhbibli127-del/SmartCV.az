@@ -33,12 +33,10 @@ export async function POST(req: NextRequest) {
       return unauthorized();
     }
 
-    const body = await parseJsonBody<{
-      type?: string;
-      title?: string;
-      message?: string;
-    }>(req);
-    const { type, title, message } = body;
+    const body = await parseJsonBody(req);
+    const type = typeof body.type === "string" ? body.type : "";
+    const title = typeof body.title === "string" ? body.title : "";
+    const message = typeof body.message === "string" ? body.message : "";
 
     if (!type || !title || !message) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
@@ -64,8 +62,11 @@ export async function PATCH(req: NextRequest) {
       return unauthorized();
     }
 
-    const body = await parseJsonBody<{ ids?: string[] }>(req);
-    await markNotificationsRead(user.email, body.ids);
+    const body = await parseJsonBody(req);
+    const ids = Array.isArray(body.ids)
+      ? body.ids.filter((id): id is string => typeof id === "string")
+      : undefined;
+    await markNotificationsRead(user.email, ids);
 
     return NextResponse.json({ success: true });
   } catch (err) {

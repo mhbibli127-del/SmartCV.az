@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { parseJsonBody } from "@/lib/safe-route";
 import { getServerSession } from 'next-auth';
 import { getAuthOptions } from '@/lib/auth-options';
 
@@ -10,7 +11,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { templateId } = await req.json();
+    const { templateId } = await parseJsonBody(req);
 
     // In production, save template selection to database
 

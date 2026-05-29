@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getOpenAI } from "@/lib/openai";
 import { requireAiAccess, recordAiUsage, aiErrorResponse } from "@/lib/ai-route-guard";
 
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
   try {
     const email = await requireAiAccess(req);
     const openai = getOpenAI();
-    const body = await req.json();
+    const body = await parseJsonBody(req);
     const cv = body?.cv;
 
     if (!cv) {

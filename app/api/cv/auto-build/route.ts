@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getAuthenticatedUser } from "@/lib/session";
 import { getOpenAI } from "@/lib/openai";
 import { emptyCV, normalizeCv } from "@/lib/cv/cv-utils";
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     const openai = getOpenAI();
-    const body = await req.json();
+    const body = await parseJsonBody(req);
     const text = typeof body?.text === "string" ? body.text.trim() : "";
 
     if (!text) {

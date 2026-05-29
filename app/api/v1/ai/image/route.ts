@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { withApiGuard, apiErrorResponse, jsonOk } from "@/lib/api/guard";
 import { isLeonardoConfigured } from "@/lib/env";
 import { createLeonardoGeneration } from "@/lib/leonardo";
@@ -43,8 +44,11 @@ export async function POST(req: NextRequest) {
       rateLimitIp: { action: "ai_image_ip", limit: 20, windowSeconds: 60 },
     });
 
-    const body = await req.json();
-    const preset = VALID_PRESETS.has(body.preset) ? (body.preset as LeonardoPresetId) : "custom";
+    const body = await parseJsonBody(req);
+    const presetRaw = typeof body.preset === "string" ? body.preset : "custom";
+    const preset = VALID_PRESETS.has(presetRaw as LeonardoPresetId)
+      ? (presetRaw as LeonardoPresetId)
+      : "custom";
     const prompt = sanitizePrompt(String(body.prompt ?? ""));
     const cvId = typeof body.cvId === "string" ? body.cvId.slice(0, 64) : undefined;
 

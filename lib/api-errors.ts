@@ -42,11 +42,24 @@ export function blockInProduction(): NextResponse | null {
   return null;
 }
 
+function isInvalidJsonError(err: unknown): boolean {
+  if (err instanceof SyntaxError) return true;
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase();
+    return msg.includes("json") || msg.includes("unexpected token");
+  }
+  return false;
+}
+
 export function handleApiError(
   err: unknown,
   context: string,
   fallbackMessage = "Something went wrong"
 ): NextResponse {
+  if (isInvalidJsonError(err)) {
+    return badRequest("Invalid JSON body", "INVALID_JSON");
+  }
+
   if (err instanceof DatabaseUnavailableError) {
     return apiJson(
       { error: err.message, code: "DATABASE_UNAVAILABLE", offline: true },

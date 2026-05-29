@@ -1,11 +1,12 @@
 "use server";
 
 import nodemailer from "nodemailer";
+import { parseJsonBody } from "@/lib/safe-route";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    const { email, otp } = await request.json();
+    const { email, otp } = await parseJsonBody(request);
     if (!email || !otp) {
       return NextResponse.json({ error: "Missing email or otp" }, { status: 400 });
     }

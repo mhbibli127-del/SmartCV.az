@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { getAuthenticatedUser } from "@/lib/session";
 import { publishResumeExport } from "@/lib/resume-service";
 import { badRequest, handleApiError, unauthorized } from "@/lib/api-errors";
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
       return unauthorized();
     }
 
-    const body = (await req.json()) as SaveResumeRequest;
+    const body = (await parseJsonBody(req)) as unknown as SaveResumeRequest;
 
     if (!body.title?.trim() || !body.templateId?.trim() || !body.content) {
       return badRequest("Invalid payload");

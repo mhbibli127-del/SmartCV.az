@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseJsonBody } from "@/lib/safe-route";
 import { createNotification, notificationMessages } from "@/lib/notifications";
 import { getAuthenticatedUser } from "@/lib/session";
 import { logger } from "@/lib/logger";
@@ -22,11 +23,14 @@ export async function POST(req: NextRequest) {
 
     await upsertSaasUserOnAuth({ email: user.email, name: user.name });
 
-    const body = await req.json();
-    const { cvData, status = "draft", notify = true, cvId, title } = body;
-    const cvStatus = status === "completed" ? "completed" : "draft";
+    const body = await parseJsonBody(req);
+    const cvData = (body.cvData ?? {}) as Record<string, unknown>;
+    const cvStatus = body.status === "completed" ? "completed" : "draft";
+    const notify = body.notify !== false;
+    const cvId = typeof body.cvId === "string" ? body.cvId : undefined;
+    const title = typeof body.title === "string" ? body.title : undefined;
 
-    const content = buildContentFromPayload(cvData ?? {});
+    const content = buildContentFromPayload(cvData);
 
     if (cvId) {
       const existing = await getCVById(user.email, cvId);
@@ -36,7 +40,12 @@ export async function POST(req: NextRequest) {
 
       const updated = await updateCVById(user.email, cvId, {
         title: title ?? titleFromContent(content),
-        templateId: cvData?.templateId,
+        templateId:
+          typeof cvData.templateId === "number"
+            ? cvData.templateId
+            : typeof cvData.templateId === "string"
+              ? Number(cvData.templateId)
+              : undefined,
         content,
         status: cvStatus,
       });
@@ -54,7 +63,10 @@ export async function POST(req: NextRequest) {
 
     const created = await createCV(user.email, {
       title: title ?? titleFromContent(content),
-      templateId: cvData?.templateId ?? 1,
+      templateId:
+        typeof cvData.templateId === "number"
+          ? cvData.templateId
+          : Number(cvData.templateId) || 1,
       content,
       status: cvStatus,
     });
