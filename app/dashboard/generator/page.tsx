@@ -123,8 +123,6 @@ export default function CVGeneratorPage() {
 
       if (ok) {
         if (data?.cvId) setSavedCvId(String(data.cvId));
-      } else if (status === 403 && data?.code === 'CV_LIMIT_REACHED') {
-        toastError('Limit reached', data.error || 'Could not save your CV.');
       } else {
         console.error('Failed to save CV to database', data);
         toastError('Save failed', data?.error || 'Could not save your CV.');

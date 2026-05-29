@@ -279,6 +279,12 @@ export async function saveResume(
   if (payload.resumeId) {
     const existing = await prisma.resume.findFirst({
       where: { id: payload.resumeId, userId },
+      select: {
+        id: true,
+        templateName: true,
+        thumbnail: true,
+        pdfUrl: true,
+      },
     });
     if (!existing) throw new Error("Resume not found");
 

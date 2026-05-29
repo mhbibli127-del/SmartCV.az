@@ -19,28 +19,17 @@ model User {
   // Primary auth method: credentials | google
   provider      String?   @default("credentials")
 
-  // --- Plan & usage (SmartCV subscription system) ---
-  plan                  String    @default("free") // free | student | basic | pro
+  // --- Usage stats (optional; not enforced) ---
+  plan                  String    @default("free")
   cvUsed                Int       @default(0)
   aiUsed                Int       @default(0)
-  cvLimit               Int       @default(20)
+  cvLimit               Int       @default(999999)
   studentVerified       Boolean   @default(false)
   studentId             String?
   verificationStatus    String    @default("none") // none | pending | verified | rejected
   studentEmailDomain    String?
 
-  // --- Admin & Paddle billing ---
   role                  String    @default("user") // user | admin
-  paddleSubscriptionId  String?   @unique
-  paddleCustomerId      String?
-  paddleSubscriptionStatus String? @default("inactive")
-
-  stripeCustomerId             String?   @unique
-  stripeSubscriptionId         String?   @unique
-  stripePriceLookupKey         String?
-  subscriptionStatus           String?   @default("inactive")
-  subscriptionPlan             String?   @default("free")
-  subscriptionCurrentPeriodEnd DateTime?
 
   accounts Account[]
   sessions Session[]

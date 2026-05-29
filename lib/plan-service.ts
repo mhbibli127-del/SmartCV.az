@@ -1,14 +1,10 @@
 /**
- * Legacy plan-service bridge — reads MongoDB SaaS user as source of truth.
+ * User plan record — open access; student verification fields retained for admin.
  */
 import prisma from "@/lib/prisma";
-import { findSaasUserByEmail, applySubscriptionFromWebhook } from "@/lib/saas-user";
-import {
-  getCvLimitForPlan,
-  getAiLimitForPlan,
-  isUserPlan,
-  type UserPlan,
-} from "@/lib/user-plans";
+import { findSaasUserByEmail } from "@/lib/saas-user";
+import { getCvLimitForPlan, getAiLimitForPlan, type UserPlan } from "@/lib/user-plans";
+import { countUserCVs } from "@/lib/plan-limits";
 
 export type VerificationStatus = "none" | "pending" | "verified" | "rejected";
 
@@ -24,7 +20,6 @@ export interface UserPlanRecord {
   studentEmailDomain: string | null;
   features: { maxAI: number };
   effectivePlan: UserPlan;
-  subscriptionStatus: string | null;
 }
 
 function isVerificationStatus(v: string | null | undefined): v is VerificationStatus {
@@ -38,14 +33,15 @@ export async function getUserPlanRecord(email: string): Promise<UserPlanRecord |
   });
   if (!saas && !prismaUser) return null;
 
-  const plan: UserPlan = saas?.plan ?? (isUserPlan(prismaUser?.plan) ? prismaUser!.plan as UserPlan : "free");
+  const plan: UserPlan = "free";
+  const cvCount = await countUserCVs(email);
 
   return {
     id: prismaUser?.id ?? 0,
     email: email.trim().toLowerCase(),
     plan,
-    cvUsed: saas?.cvUsed ?? prismaUser?.cvUsed ?? 0,
-    cvLimit: saas?.cvLimit ?? getCvLimitForPlan(plan),
+    cvUsed: saas?.cvUsed ?? prismaUser?.cvUsed ?? cvCount,
+    cvLimit: getCvLimitForPlan(plan),
     studentVerified: prismaUser?.studentVerified ?? false,
     studentId: prismaUser?.studentId ?? null,
     verificationStatus: isVerificationStatus(prismaUser?.verificationStatus)
@@ -54,7 +50,6 @@ export async function getUserPlanRecord(email: string): Promise<UserPlanRecord |
     studentEmailDomain: prismaUser?.studentEmailDomain ?? null,
     features: { maxAI: getAiLimitForPlan(plan) },
     effectivePlan: plan,
-    subscriptionStatus: saas?.status ?? prismaUser?.subscriptionStatus ?? "active",
   };
 }
 
@@ -76,43 +71,25 @@ export async function rejectStudentVerification(userId: number) {
   });
 }
 
-export async function setUserPlan(userId: number, plan: UserPlan) {
-  const user = await prisma.user.update({
+/** @deprecated Plans are not sold — always stores free */
+export async function setUserPlan(userId: number, _plan: UserPlan) {
+  return prisma.user.update({
     where: { id: userId },
-    data: { plan },
+    data: { plan: "free" },
   });
-  if (user.email) {
-    await applySubscriptionFromWebhook({
-      email: user.email,
-      plan,
-      status: "active",
-    });
-  }
-  return user;
 }
 
 export async function checkCanCreateCV(
   email: string,
-  options: { existingCvWillBeUpdated?: boolean } = {}
+  _options: { existingCvWillBeUpdated?: boolean } = {}
 ) {
-  const { assertCanCreateCV } = await import("@/lib/cv-limit");
-  const result = await assertCanCreateCV(email, options);
-  if (result.allowed) {
-    return {
-      ok: true as const,
-      plan: result.user.plan,
-      effectivePlan: result.user.plan,
-      cvUsed: result.user.cvUsed,
-      cvLimit: result.user.cvLimit,
-    };
-  }
+  void email;
   return {
-    ok: false as const,
-    reason: "limit_reached" as const,
-    plan: result.user.plan,
-    effectivePlan: result.user.plan,
-    cvUsed: result.user.cvUsed,
-    cvLimit: result.user.cvLimit,
+    ok: true as const,
+    plan: "free" as UserPlan,
+    effectivePlan: "free" as UserPlan,
+    cvUsed: 0,
+    cvLimit: getCvLimitForPlan("free"),
   };
 }
 
@@ -120,9 +97,6 @@ export async function syncCvUsed(userId: number, cvCount: number) {
   await prisma.user.update({ where: { id: userId }, data: { cvUsed: cvCount } });
 }
 
-/** @deprecated Stripe removed — kept for legacy imports */
-export function stripeTierToPlan(tier: string | null | undefined): UserPlan {
-  if (tier === "basic") return "basic";
-  if (tier === "pro" || tier === "starter" || tier === "premium") return "pro";
+export function stripeTierToPlan(_tier: string | null | undefined): UserPlan {
   return "free";
 }

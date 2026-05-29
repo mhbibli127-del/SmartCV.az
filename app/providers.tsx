@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import AuthProvider from "@/components/providers/AuthProvider";
-import { SubscriptionProvider } from "@/components/providers/SubscriptionProvider";
 import { PostHogAnalyticsProvider } from "@/components/providers/PostHogAnalyticsProvider";
 import { PostHogSessionBridge } from "@/components/providers/PostHogSessionBridge";
 import { ClientErrorHandlers } from "@/components/providers/ClientErrorHandlers";
@@ -14,11 +13,9 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <AuthProvider>
         <ClientErrorHandlers />
         <PostHogSessionBridge />
-        <SubscriptionProvider>
-          <ErrorBoundary homeHref="/" homeLabel="Go home">
-            {children}
-          </ErrorBoundary>
-        </SubscriptionProvider>
+        <ErrorBoundary homeHref="/" homeLabel="Go home">
+          {children}
+        </ErrorBoundary>
       </AuthProvider>
     </PostHogAnalyticsProvider>
   );

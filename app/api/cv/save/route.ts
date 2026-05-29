@@ -50,18 +50,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const decision = await assertCanCreateCV(user.email);
-    if (!decision.allowed) {
-      return NextResponse.json(
-        {
-          error: decision.error,
-          code: decision.code,
-          upgradeRequired: decision.code === "CV_LIMIT_REACHED",
-          plan: decision.user.plan,
-        },
-        { status: 403 }
-      );
-    }
+    await assertCanCreateCV(user.email);
 
     const created = await createCV(user.email, {
       title: title ?? titleFromContent(content),

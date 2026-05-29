@@ -31,17 +31,7 @@ export async function POST(req: NextRequest) {
 
     await upsertSaasUserOnAuth({ email: user.email, name: user.name });
 
-    const decision = await assertCanCreateCV(user.email);
-    if (!decision.allowed) {
-      return NextResponse.json(
-        {
-          error: decision.error,
-          code: decision.code,
-          upgradeRequired: true,
-        },
-        { status: 403 }
-      );
-    }
+    await assertCanCreateCV(user.email);
 
     const body = await req.json().catch(() => ({}));
     const cv = await createCV(user.email, {

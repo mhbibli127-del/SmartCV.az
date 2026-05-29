@@ -3,8 +3,6 @@
  * Never throws — failures are logged and swallowed.
  */
 import nodemailer from "nodemailer";
-import type { UserPlan } from "@/lib/user-plans";
-
 type SendResult = { ok: boolean; method?: string; error?: string };
 
 function getSmtpConfig() {
@@ -102,43 +100,3 @@ export async function sendStudentApprovedEmail(email: string, name?: string | nu
   return sendTransactionalEmail({ to: email, subject, text, html });
 }
 
-export async function sendPlanUpgradeEmail(
-  email: string,
-  plan: UserPlan,
-  name?: string | null
-) {
-  const label = plan === "pro" ? "Pro" : plan === "basic" ? "Basic" : plan;
-  const greeting = name ? `Hi ${name},` : "Hi,";
-  const subject = `You are now a ${label} user`;
-  const text = `${greeting}\n\nYour SmartCV plan has been upgraded to ${label}. Enjoy your new features!\n\n— SmartCV Team`;
-  const html = wrapHtml(
-    `Welcome to ${label}`,
-    `<p style="color:#475569;">${greeting}</p>
-     <p style="color:#475569;">You are now a <strong>${label}</strong> user. Your subscription is active and all plan features are unlocked.</p>
-     <p style="margin-top:24px;"><a href="https://smartcv.az/dashboard" style="background:#0f172a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Start Building</a></p>`
-  );
-  return sendTransactionalEmail({ to: email, subject, text, html });
-}
-
-export async function sendCvLimitReachedEmail(
-  email: string,
-  name?: string | null,
-  cvUsed?: number,
-  cvLimit?: number
-) {
-  const greeting = name ? `Hi ${name},` : "Hi,";
-  const subject = "Upgrade to continue using SmartCV";
-  const usage =
-    cvUsed != null && cvLimit != null
-      ? `You've used ${cvUsed} of ${cvLimit} CVs on your current plan.`
-      : "You've reached your CV limit on your current plan.";
-  const text = `${greeting}\n\n${usage}\n\nUpgrade to continue using SmartCV: https://smartcv.az/pricing\n\n— SmartCV Team`;
-  const html = wrapHtml(
-    "CV Limit Reached",
-    `<p style="color:#475569;">${greeting}</p>
-     <p style="color:#475569;">${usage}</p>
-     <p style="color:#475569;">Upgrade your plan to create more CVs and unlock premium AI features.</p>
-     <p style="margin-top:24px;"><a href="https://smartcv.az/pricing" style="background:#0f172a;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">View Plans</a></p>`
-  );
-  return sendTransactionalEmail({ to: email, subject, text, html });
-}

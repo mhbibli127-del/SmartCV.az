@@ -132,16 +132,11 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (!body.plan || !isUserPlan(body.plan)) {
-      return NextResponse.json(
-        { error: "plan must be one of: free, basic, pro" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'plan must be "free"' }, { status: 400 });
     }
 
-    const updated = await setUserPlan(userId, body.plan);
-    console.log(
-      `[admin] Plan changed userId=${userId} → ${body.plan} by ${admin.email}`
-    );
+    const updated = await setUserPlan(userId, "free");
+    console.log(`[admin] Plan reset userId=${userId} → free by ${admin.email}`);
 
     return NextResponse.json({
       success: true,

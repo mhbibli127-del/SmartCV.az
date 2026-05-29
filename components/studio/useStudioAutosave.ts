@@ -1,19 +1,22 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { getCanvasStateFromStore, useEditorStore } from "@/lib/editor-store";
 import { useDesignStore } from "@/lib/design-store";
 import { canvasToSections } from "@/lib/cv-hydration";
 import { designSnapshot } from "@/lib/design-persistence";
 import { writeStudioDraft, type StudioDraft } from "@/lib/studio-draft";
 import { dispatchResumeGalleryUpdate } from "@/lib/resume-gallery-events";
+import {
+  buildEditorAutosaveFingerprint,
+  revisionFromElements,
+  syncResumeIdInUrl,
+} from "@/lib/resume-save-client";
 
-/** Local draft — fast, survives refresh */
 const LOCAL_AUTOSAVE_MS = 2000;
-/** Remote Prisma save — slower to reduce DB load */
-const DB_AUTOSAVE_MS = 12_000;
+const DB_AUTOSAVE_MS = 15_000;
 const MAX_BACKOFF_MS = 60_000;
+const MIN_DB_SAVE_INTERVAL_MS = 12_000;
 
 interface UseStudioAutosaveOptions {
   resumeId: string | null;
@@ -21,34 +24,52 @@ interface UseStudioAutosaveOptions {
 }
 
 export function useStudioAutosave({ resumeId, title }: UseStudioAutosaveOptions) {
-  const router = useRouter();
   const elements = useEditorStore((s) => s.elements);
   const pageCount = useEditorStore((s) => s.pageCount);
   const markSaved = useEditorStore((s) => s.markSaved);
   const activeTheme = useDesignStore((s) => s.activeTheme);
   const selectedTemplate = useDesignStore((s) => s.selectedTemplate);
+
   const localTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dbTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savingRef = useRef(false);
   const resumeIdRef = useRef(resumeId);
   const failStreakRef = useRef(0);
   const backoffUntilRef = useRef(0);
+  const lastSavedFingerprintRef = useRef<string | null>(null);
+  const lastDbSaveAtRef = useRef(0);
 
-  useEffect(() => {
-    resumeIdRef.current = resumeId;
-  }, [resumeId]);
+  const themeKey = activeTheme.id;
+  const templateKey = selectedTemplate?.slug ?? selectedTemplate?.id ?? "none";
+  const elementRevision = revisionFromElements(
+    elements.map((el) => ({
+      id: el.id,
+      content: el.text ?? el.content,
+      src: el.src,
+    }))
+  );
+  const dbFingerprint = buildEditorAutosaveFingerprint(
+    title,
+    themeKey,
+    elements.length,
+    `${elementRevision}|${templateKey}|${pageCount}`
+  );
+
+  resumeIdRef.current = resumeId;
 
   useEffect(() => {
     if (localTimerRef.current) clearTimeout(localTimerRef.current);
 
     localTimerRef.current = setTimeout(() => {
+      const state = useEditorStore.getState();
+      const design = useDesignStore.getState();
       const draft: StudioDraft = {
         title,
         cvId: resumeIdRef.current,
-        elements,
-        pageCount,
-        designTheme: activeTheme,
-        selectedTemplateSlug: selectedTemplate?.slug ?? null,
+        elements: state.elements,
+        pageCount: state.pageCount,
+        designTheme: design.activeTheme,
+        selectedTemplateSlug: design.selectedTemplate?.slug ?? null,
         updatedAt: Date.now(),
       };
       writeStudioDraft(draft);
@@ -57,7 +78,7 @@ export function useStudioAutosave({ resumeId, title }: UseStudioAutosaveOptions)
     return () => {
       if (localTimerRef.current) clearTimeout(localTimerRef.current);
     };
-  }, [elements, title, pageCount, activeTheme, selectedTemplate]);
+  }, [dbFingerprint, title, pageCount, themeKey, templateKey]);
 
   useEffect(() => {
     if (dbTimerRef.current) clearTimeout(dbTimerRef.current);
@@ -71,12 +92,20 @@ export function useStudioAutosave({ resumeId, title }: UseStudioAutosaveOptions)
       void (async () => {
         if (savingRef.current) return;
         if (Date.now() < backoffUntilRef.current) return;
+        if (elements.length === 0) return;
+        if (Date.now() - lastDbSaveAtRef.current < MIN_DB_SAVE_INTERVAL_MS) return;
+        if (lastSavedFingerprintRef.current === dbFingerprint && resumeIdRef.current) {
+          return;
+        }
 
         savingRef.current = true;
 
-        const tplId = selectedTemplate?.id ?? selectedTemplate?.slug ?? "tpl-minimal-corporate";
+        const designState = useDesignStore.getState();
+        const tpl = designState.selectedTemplate;
+        const theme = designState.activeTheme;
+        const tplId = tpl?.id ?? tpl?.slug ?? "tpl-minimal-corporate";
         const canvas = getCanvasStateFromStore();
-        const design = designSnapshot(activeTheme, selectedTemplate);
+        const design = designSnapshot(theme, tpl);
 
         try {
           const res = await fetch("/api/resumes/save", {
@@ -87,7 +116,7 @@ export function useStudioAutosave({ resumeId, title }: UseStudioAutosaveOptions)
               resumeId: resumeIdRef.current ?? undefined,
               title,
               templateId: tplId,
-              templateName: selectedTemplate?.title,
+              templateName: tpl?.title,
               content: {
                 mode: "visual",
                 canvas,
@@ -102,10 +131,12 @@ export function useStudioAutosave({ resumeId, title }: UseStudioAutosaveOptions)
             backoffUntilRef.current = 0;
             const data = await res.json();
             markSaved();
-            if (!resumeIdRef.current && data.resumeId) {
+            if (data.resumeId && !resumeIdRef.current) {
               resumeIdRef.current = data.resumeId;
-              router.replace(`/dashboard/studio?id=${data.resumeId}`);
+              syncResumeIdInUrl(data.resumeId, tpl?.slug ?? null);
             }
+            lastSavedFingerprintRef.current = dbFingerprint;
+            lastDbSaveAtRef.current = Date.now();
             dispatchResumeGalleryUpdate({
               resumeId: data.resumeId ?? resumeIdRef.current ?? undefined,
             });
@@ -131,5 +162,7 @@ export function useStudioAutosave({ resumeId, title }: UseStudioAutosaveOptions)
     return () => {
       if (dbTimerRef.current) clearTimeout(dbTimerRef.current);
     };
-  }, [elements, title, pageCount, activeTheme, selectedTemplate, markSaved, router]);
+  }, [dbFingerprint, elements.length, markSaved, title]);
+
+  return { resumeIdRef };
 }

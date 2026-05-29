@@ -1,5 +1,3 @@
-import type { PlanId } from "@/lib/plans";
-
 export type AccountSectionId =
   | "profile"
   | "security"
@@ -34,14 +32,3 @@ export interface AiPreferences {
   autoImprove: boolean;
 }
 
-export interface BillingInfo {
-  plan: PlanId;
-  nextBillingDate: string | null;
-}
-
-export interface BillingHistoryItem {
-  id: string;
-  date: string;
-  amount: string;
-  status: "paid" | "pending" | "failed";
-}

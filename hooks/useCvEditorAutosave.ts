@@ -3,10 +3,16 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useCvEditorStore } from "@/store/cv-editor-store";
 import { cvElementsToApiCanvas } from "@/lib/cv-editor/serialize-canvas";
+import {
+  buildEditorAutosaveFingerprint,
+  revisionFromElements,
+  syncResumeIdInUrl,
+} from "@/lib/resume-save-client";
 import type { SaveStatus } from "@/types/cv-editor";
 import type { ResumeContent } from "@/types/resume";
 
-const DEBOUNCE_MS = 1500;
+const DEBOUNCE_MS = 2500;
+const MIN_SAVE_INTERVAL_MS = 3000;
 
 export interface SaveResumeAssets {
   thumbnailDataUrl?: string;
@@ -15,7 +21,11 @@ export interface SaveResumeAssets {
 
 export function useCvEditorAutosave(title: string, enabled = true) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const persistRef = useRef<(assets?: SaveResumeAssets) => Promise<void>>(async () => {});
+  const savingRef = useRef(false);
+  const cvIdRef = useRef<string | null>(null);
+  const lastSavedFingerprintRef = useRef<string | null>(null);
+  const lastSaveAtRef = useRef(0);
+
   const elements = useCvEditorStore((s) => s.elements);
   const background = useCvEditorStore((s) => s.background);
   const template = useCvEditorStore((s) => s.template);
@@ -23,13 +33,38 @@ export function useCvEditorAutosave(title: string, enabled = true) {
   const setCvId = useCvEditorStore((s) => s.setCvId);
   const setSaveStatus = useCvEditorStore((s) => s.setSaveStatus);
 
+  cvIdRef.current = cvId;
+
+  const elementRevision = revisionFromElements(elements);
+  const fingerprint = buildEditorAutosaveFingerprint(
+    title,
+    background,
+    elements.length,
+    elementRevision
+  );
+
   const persist = useCallback(
     async (assets?: SaveResumeAssets) => {
-      if (elements.length === 0) return;
+      if (elements.length === 0 || savingRef.current) return;
 
+      const currentFingerprint = buildEditorAutosaveFingerprint(
+        title,
+        background,
+        elements.length,
+        revisionFromElements(elements)
+      );
+
+      if (
+        lastSavedFingerprintRef.current === currentFingerprint &&
+        cvIdRef.current
+      ) {
+        return;
+      }
+
+      savingRef.current = true;
       setSaveStatus("saving");
-      const canvas = cvElementsToApiCanvas(elements, background);
 
+      const canvas = cvElementsToApiCanvas(elements, background);
       const content: ResumeContent = {
         mode: "visual",
         canvas,
@@ -45,7 +80,7 @@ export function useCvEditorAutosave(title: string, enabled = true) {
           credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            resumeId: cvId ?? undefined,
+            resumeId: cvIdRef.current ?? undefined,
             title,
             templateId: template?.id ?? template?.slug ?? "tpl-minimal-corporate",
             templateName: template?.name,
@@ -61,39 +96,38 @@ export function useCvEditorAutosave(title: string, enabled = true) {
         }
 
         const data = await res.json();
-        if (data.resumeId && !cvId) {
+        if (data.resumeId && !cvIdRef.current) {
+          cvIdRef.current = data.resumeId;
           setCvId(data.resumeId);
-          const url = new URL(window.location.href);
-          url.searchParams.set("id", data.resumeId);
-          if (template?.id) url.searchParams.set("template", template.id);
-          window.history.replaceState(null, "", url.toString());
+          syncResumeIdInUrl(data.resumeId, template?.id ?? template?.slug ?? null);
         }
 
+        lastSavedFingerprintRef.current = currentFingerprint;
+        lastSaveAtRef.current = Date.now();
         setSaveStatus("saved", new Date().toISOString());
       } catch {
         setSaveStatus("error");
         throw new Error("Save failed");
+      } finally {
+        savingRef.current = false;
       }
     },
-    [
-      background,
-      cvId,
-      elements,
-      setCvId,
-      setSaveStatus,
-      template,
-      title,
-    ]
+    [background, elements, setCvId, setSaveStatus, template, title]
   );
-
-  persistRef.current = persist;
 
   useEffect(() => {
     if (!enabled || elements.length === 0) return;
 
     if (timerRef.current) clearTimeout(timerRef.current);
+
     timerRef.current = setTimeout(() => {
-      void persistRef.current().catch((err) => {
+      if (savingRef.current) return;
+      if (Date.now() - lastSaveAtRef.current < MIN_SAVE_INTERVAL_MS) return;
+      if (lastSavedFingerprintRef.current === fingerprint && cvIdRef.current) {
+        return;
+      }
+
+      void persist().catch((err) => {
         console.error("[cv-editor/autosave]", err);
       });
     }, DEBOUNCE_MS);
@@ -101,7 +135,7 @@ export function useCvEditorAutosave(title: string, enabled = true) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [elements, background, title, enabled]);
+  }, [enabled, fingerprint, persist]);
 
   return { persist };
 }

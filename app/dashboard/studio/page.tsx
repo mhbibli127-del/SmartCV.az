@@ -32,6 +32,7 @@ import {
   readStudioDraft,
   writeStudioDraft,
 } from "@/lib/studio-draft";
+import { syncResumeIdInUrl } from "@/lib/resume-save-client";
 import type { CanvasEditorHandle } from "@/components/editor/CanvasEditor";
 import type { CVContent, EditorElement } from "@/types/cv-document";
 import type { ResumeContent } from "@/types/resume";
@@ -166,7 +167,16 @@ function StudioEditorContent() {
 
   useEffect(() => {
     const initKey = `${cvId ?? "new"}|${templateSlug ?? ""}`;
-    if (initKeyRef.current === initKey) {
+    const existingElements = useEditorStore.getState().elements;
+
+    if (initKeyRef.current === initKey && existingElements.length > 0) {
+      setLoading(false);
+      return;
+    }
+
+    // URL gained ?id= from autosave — skip reload (prevents replaceState → init → save loop).
+    if (cvId && existingElements.length > 0 && initKeyRef.current) {
+      initKeyRef.current = initKey;
       setLoading(false);
       return;
     }
@@ -228,7 +238,6 @@ function StudioEditorContent() {
 
     return () => {
       cancelled = true;
-      initKeyRef.current = null;
     };
   }, [cvId, templateSlug, loadElements, hydrateDesign, hydrateFromContent, applyTemplateBySlug]);
 
@@ -258,11 +267,11 @@ function StudioEditorContent() {
     const data = await res.json();
     markSaved();
     if (!cvId && data.resumeId) {
-      router.replace(`/dashboard/studio?id=${data.resumeId}`);
+      syncResumeIdInUrl(data.resumeId, selectedTemplate?.slug ?? null);
     }
     dispatchResumeGalleryUpdate({ resumeId: data.resumeId ?? cvId ?? undefined });
     return data;
-  }, [cvId, title, markSaved, router, activeTheme, selectedTemplate]);
+  }, [cvId, title, markSaved, activeTheme, selectedTemplate]);
 
   const handleSave = async () => {
     setSaving(true);

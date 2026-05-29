@@ -127,37 +127,9 @@ export function requireEnv(name: string): string {
   return value;
 }
 
-export function getStripeSecretKey(): string | null {
-  return readSecret("STRIPE_SECRET_KEY");
-}
-
-export function getStripeWebhookSecret(): string | null {
-  return readSecret("STRIPE_WEBHOOK_SECRET");
-}
-
-export function isStripeBillingConfigured(): boolean {
-  return Boolean(getStripeSecretKey() && getStripeWebhookSecret());
-}
-
-export function isPaddleBillingConfigured(): boolean {
-  const clientToken = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN?.trim();
-  const hasClientToken = Boolean(clientToken && !isPlaceholder(clientToken));
-  const basic =
-    process.env.PADDLE_PRICE_BASIC?.trim() ||
-    process.env.PADDLE_BASIC_PRICE_ID?.trim();
-  const pro =
-    process.env.PADDLE_PRICE_PRO?.trim() ||
-    process.env.PADDLE_PRO_PRICE_ID?.trim();
-  const hasPriceIds = Boolean(
-    (basic && !isPlaceholder(basic)) || (pro && !isPlaceholder(pro))
-  );
-  const hasApiKey = Boolean(readSecret("PADDLE_API_KEY"));
-
-  return hasApiKey || hasClientToken || hasPriceIds;
-}
-
+/** Billing removed — app is fully open. */
 export function isPaymentConfigured(): boolean {
-  return isPaddleBillingConfigured() || isStripeBillingConfigured();
+  return false;
 }
 
 export function getDirectUrl(): string | null {

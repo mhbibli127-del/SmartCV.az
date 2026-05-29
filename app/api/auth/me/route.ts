@@ -6,14 +6,23 @@ import {
   ensureGoogleUser,
 } from "@/lib/google-session-bridge";
 import { cookieSecureFromRequest } from "@/lib/auth-cookie";
+import { assertDatabaseAvailable } from "@/lib/db-circuit";
+import { handleApiError } from "@/lib/api-errors";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 10;
 
 export async function GET(req: NextRequest) {
   try {
     const auth = await getAuthenticatedUser(req);
     if (!auth?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+      assertDatabaseAvailable();
+    } catch {
+      /* Prisma may be misconfigured — findUserByEmail falls back to local JSON */
     }
 
     const user = await findUserByEmail(auth.email);
@@ -37,21 +46,24 @@ export async function GET(req: NextRequest) {
       image: ("image" in user ? user.image : null) ?? auth.image ?? null,
     });
   } catch (error: unknown) {
-    console.error("[auth/me]", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleApiError(error, "auth/me GET", "Failed to load profile");
   }
 }
 
 /**
  * Bridge a valid NextAuth (Google) session into JWT + auth_state cookies.
- * Primary OAuth flow uses GET /api/auth/sync-session; this POST remains
- * for client recovery when cookies are missing but NextAuth session exists.
  */
 export async function POST(req: NextRequest) {
   try {
     const auth = await getAuthenticatedUser(req);
     if (!auth?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    try {
+      assertDatabaseAvailable();
+    } catch {
+      /* allow bridge with local user record when Postgres is down */
     }
 
     const email = auth.email.toLowerCase().trim();
@@ -72,7 +84,6 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error: unknown) {
-    console.error("[auth/me POST bridge]", error);
-    return NextResponse.json({ error: "Failed to sync session" }, { status: 500 });
+    return handleApiError(error, "auth/me POST bridge", "Failed to sync session");
   }
 }

@@ -22,17 +22,14 @@ export async function GET(req: NextRequest) {
         email: true,
         name: true,
         image: true,
-        subscriptionStatus: true,
-        subscriptionPlan: true,
-        stripePriceLookupKey: true,
-        subscriptionCurrentPeriodEnd: true,
       },
     });
     if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     return NextResponse.json({ success: true, user });
-  } catch (err: any) {
-    console.error(err);
-    return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
+  } catch (err: unknown) {
+    console.error("[user/me]", err);
+    const message = err instanceof Error ? err.message : "Internal server error";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

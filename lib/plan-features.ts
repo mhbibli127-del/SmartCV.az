@@ -1,18 +1,17 @@
-import type { UserPlan } from "@/lib/user-plans";
+/** All features are open — no paid tiers. */
 
-/** Feature gates by subscription plan */
-export function canAccessPremiumTemplates(plan: UserPlan): boolean {
-  return plan === "basic" || plan === "pro";
+export function canAccessPremiumTemplates(): boolean {
+  return true;
 }
 
-export function canUseCollab(plan: UserPlan): boolean {
-  return plan === "pro";
+export function canExportWithoutWatermark(): boolean {
+  return true;
 }
 
-export function canExportPng(plan: UserPlan): boolean {
-  return plan === "basic" || plan === "pro";
+export function canUseAdvancedAI(): boolean {
+  return true;
 }
 
-export function canExportDocx(plan: UserPlan): boolean {
-  return plan === "pro";
+export function hasUnlimitedCVs(): boolean {
+  return true;
 }

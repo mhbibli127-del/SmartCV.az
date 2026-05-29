@@ -50,9 +50,21 @@ function EditorPageContent() {
 
   useEffect(() => {
     const initKey = `${cvIdParam ?? "new"}|${templateId ?? ""}`;
-
+    const storeCvId = useCvEditorStore.getState().cvId;
     const existingElements = useCvEditorStore.getState().elements;
+
     if (initKeyRef.current === initKey && existingElements.length > 0) {
+      setLoading(false);
+      return;
+    }
+
+    // Autosave synced ?id= via replaceState — do not reload and re-trigger save loop.
+    if (
+      cvIdParam &&
+      storeCvId === cvIdParam &&
+      existingElements.length > 0
+    ) {
+      initKeyRef.current = initKey;
       setLoading(false);
       return;
     }
@@ -166,7 +178,6 @@ function EditorPageContent() {
 
     return () => {
       cancelled = true;
-      initKeyRef.current = null;
     };
   }, [
     cvIdParam,
