@@ -1,6 +1,7 @@
 "use client";
 
 import * as Sentry from "@sentry/nextjs";
+import { isSentryEnabled } from "@/lib/sentry/options";
 import { useEffect } from "react";
 import Link from "next/link";
 import { AlertTriangle, RefreshCw } from "lucide-react";
@@ -13,7 +14,9 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    if (isSentryEnabled()) {
+      Sentry.captureException(error);
+    }
     console.error("[global-error]", error);
   }, [error]);
 

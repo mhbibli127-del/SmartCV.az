@@ -59,6 +59,7 @@ export default function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
+// Sentry tunnel is `/monitoring` (see next.config.mjs) — intentionally excluded from matcher.
 export const config = {
   matcher: [
     "/",

@@ -20,7 +20,14 @@ const RECOMMENDED = [
   "CLOUDINARY_API_SECRET",
 ];
 
-const OPTIONAL = ["MONGODB_URI", "NEXT_PUBLIC_POSTHOG_KEY", "SENTRY_DSN"];
+const OPTIONAL = [
+  "MONGODB_URI",
+  "NEXT_PUBLIC_POSTHOG_KEY",
+  "SENTRY_DSN",
+  "NEXT_PUBLIC_SENTRY_DSN",
+];
+
+const SENTRY_BUILD = ["SENTRY_AUTH_TOKEN"];
 
 function isSet(name) {
   const value = process.env[name]?.trim();
@@ -55,6 +62,16 @@ if (!isSet("CLOUDINARY_CLOUD_NAME")) {
 console.log("\nOptional:");
 for (const name of OPTIONAL) {
   console.log(`  ${isSet(name) ? "OK      " : "skip    "}${name}`);
+}
+
+console.log("\nSentry source maps (production builds):");
+for (const name of SENTRY_BUILD) {
+  console.log(`  ${isSet(name) ? "OK      " : "skip    "}${name}`);
+}
+if (isSet("SENTRY_DSN") && !isSet("SENTRY_AUTH_TOKEN")) {
+  console.log(
+    "  NOTE: Without SENTRY_AUTH_TOKEN, builds skip source map upload (no errors; minified stacks)."
+  );
 }
 
 if (process.env.DATABASE_URL?.includes(":6543")) {

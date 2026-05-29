@@ -44,7 +44,13 @@ openssl rand -base64 32
 | `NEXT_PUBLIC_POSTHOG_ENABLED` | Set `true` only with a valid `phc_` project key |
 | `NEXT_PUBLIC_POSTHOG_KEY` | PostHog Project API Key (`phc_…` from Project Settings) |
 | `NEXT_PUBLIC_POSTHOG_HOST` | `https://us.i.posthog.com` or `https://eu.i.posthog.com` |
-| `SENTRY_DSN` | Error monitoring |
+| `SENTRY_DSN` | Server error monitoring (optional) |
+| `NEXT_PUBLIC_SENTRY_DSN` | Same DSN as above — required for browser errors |
+| `SENTRY_AUTH_TOKEN` | Source map upload at build (Production; secret) |
+| `SENTRY_ORG` | `smartcv-99` (default if omitted) |
+| `SENTRY_PROJECT` | `javascript-nextjs` (default if omitted) |
+
+**Sentry on Vercel:** `VERCEL_GIT_COMMIT_SHA` is set automatically and used as the release name. Without `SENTRY_AUTH_TOKEN`, the app still runs but stack traces stay minified (no build warnings).
 
 ## 5. Database setup
 

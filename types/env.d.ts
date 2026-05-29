@@ -30,7 +30,15 @@ declare namespace NodeJS {
     NEXT_PUBLIC_POSTHOG_HOST?: string;
     SENTRY_DSN?: string;
     NEXT_PUBLIC_SENTRY_DSN?: string;
+    SENTRY_AUTH_TOKEN?: string;
+    SENTRY_ORG?: string;
+    SENTRY_PROJECT?: string;
+    SENTRY_RELEASE?: string;
+    NEXT_PUBLIC_SENTRY_RELEASE?: string;
     SENTRY_ENVIRONMENT?: string;
+    VERCEL_ENV?: string;
+    VERCEL_GIT_COMMIT_SHA?: string;
+    NEXT_PUBLIC_VERCEL_ENV?: string;
     ENCRYPTION_KEY?: string;
     CRON_SECRET?: string;
   }

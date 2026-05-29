@@ -1,24 +1,26 @@
 import * as Sentry from "@sentry/nextjs";
-import { getSentryDsn } from "@/lib/sentry/options";
+import { getClientSentryOptions, isSentryEnabled } from "@/lib/sentry/options";
 
-/** Client-side Sentry init — used by instrumentation-client.ts */
+let initialized = false;
+
+/** Client-side Sentry init — called once from instrumentation-client.ts */
 export function initSentryClient(): void {
-  const dsn = getSentryDsn();
-  if (!dsn) return;
+  if (initialized || !isSentryEnabled()) return;
+
+  const options = getClientSentryOptions();
+  if (options.enabled === false) return;
 
   Sentry.init({
-    dsn,
-    environment:
-      process.env.NEXT_PUBLIC_VERCEL_ENV ||
-      process.env.NODE_ENV ||
-      "development",
-    integrations: [Sentry.replayIntegration()],
-    tracesSampleRate: process.env.NODE_ENV === "development" ? 1.0 : 0.1,
-    enableLogs: true,
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
-    sendDefaultPii: true,
+    ...options,
+    integrations: [
+      Sentry.replayIntegration({
+        maskAllText: true,
+        blockAllMedia: true,
+      }),
+    ],
   });
+
+  initialized = true;
 }
 
 export { Sentry };
