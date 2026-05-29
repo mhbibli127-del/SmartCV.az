@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { captureExceptionSafe } from "@/lib/sentry/safe-capture";
 
 export default function GlobalError({
   error,
@@ -12,6 +13,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
+    captureExceptionSafe(error);
     console.error("[app/error]", error);
   }, [error]);
 

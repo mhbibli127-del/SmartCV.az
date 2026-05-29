@@ -1,7 +1,11 @@
 // Client-side Sentry initialization (App Router).
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
-import { initSentryClient, Sentry } from "@/lib/sentry/client";
+import { getRouterTransitionCapture, initSentryClient } from "@/lib/sentry/client";
 
-initSentryClient();
+try {
+  initSentryClient();
+} catch (err) {
+  console.error("[instrumentation-client] init failed", err);
+}
 
-export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
+export const onRouterTransitionStart = getRouterTransitionCapture();

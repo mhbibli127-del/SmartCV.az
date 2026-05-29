@@ -5,10 +5,18 @@ import { getNextAuthUrl } from "@/lib/env";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const { enabled, callbackUrl } = getGoogleOAuthConfig();
-  return NextResponse.json({
-    google: enabled,
-    callbackUrl,
-    nextAuthUrl: getNextAuthUrl(),
-  });
+  try {
+    const { enabled, callbackUrl } = getGoogleOAuthConfig();
+    return NextResponse.json({
+      google: enabled,
+      callbackUrl,
+      nextAuthUrl: getNextAuthUrl(),
+    });
+  } catch {
+    return NextResponse.json({
+      google: false,
+      callbackUrl: null,
+      nextAuthUrl: process.env.NEXTAUTH_URL ?? null,
+    });
+  }
 }

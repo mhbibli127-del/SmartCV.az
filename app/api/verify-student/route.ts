@@ -11,26 +11,34 @@ export const dynamic = "force-dynamic";
 
 /** GET — current student verification status */
 export async function GET(req: NextRequest) {
-  const auth = await getAuthenticatedUser(req);
-  if (!auth?.email) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  try {
+    const auth = await getAuthenticatedUser(req);
+    if (!auth?.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const record = await getUserPlanRecord(auth.email);
-  if (!record) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
+    const record = await getUserPlanRecord(auth.email);
+    if (!record) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
 
-  return NextResponse.json({
-    plan: record.plan,
-    effectivePlan: record.effectivePlan,
-    studentVerified: record.studentVerified,
-    studentId: record.studentId ? maskStudentId(record.studentId) : null,
-    verificationStatus: record.verificationStatus,
-    studentEmailDomain: record.studentEmailDomain,
-    cvUsed: record.cvUsed,
-    cvLimit: record.cvLimit,
-  });
+    return NextResponse.json({
+      plan: record.plan,
+      effectivePlan: record.effectivePlan,
+      studentVerified: record.studentVerified,
+      studentId: record.studentId ? maskStudentId(record.studentId) : null,
+      verificationStatus: record.verificationStatus,
+      studentEmailDomain: record.studentEmailDomain,
+      cvUsed: record.cvUsed,
+      cvLimit: record.cvLimit,
+    });
+  } catch (err) {
+    console.error("[verify-student GET]", err);
+    return NextResponse.json(
+      { error: "Failed to load verification status", code: "INTERNAL_ERROR" },
+      { status: 500 }
+    );
+  }
 }
 
 /**

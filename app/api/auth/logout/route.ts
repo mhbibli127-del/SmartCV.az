@@ -25,13 +25,21 @@ function clearAuthCookies(res: NextResponse, secure: boolean) {
 }
 
 export async function GET(request: NextRequest) {
-  const secure = cookieSecureFromRequest(request);
-  const loginUrl = new URL("/login", request.url);
-  const res = NextResponse.redirect(loginUrl);
-  return clearAuthCookies(res, secure);
+  try {
+    const secure = cookieSecureFromRequest(request);
+    const loginUrl = new URL("/login", request.url);
+    const res = NextResponse.redirect(loginUrl);
+    return clearAuthCookies(res, secure);
+  } catch {
+    return NextResponse.json({ success: true, redirect: "/login" });
+  }
 }
 
 export async function POST(request: NextRequest) {
-  const secure = cookieSecureFromRequest(request);
-  return clearAuthCookies(NextResponse.json({ success: true }), secure);
+  try {
+    const secure = cookieSecureFromRequest(request);
+    return clearAuthCookies(NextResponse.json({ success: true }), secure);
+  } catch {
+    return NextResponse.json({ success: true });
+  }
 }

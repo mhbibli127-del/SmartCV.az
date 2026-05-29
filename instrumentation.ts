@@ -10,14 +10,18 @@ import {
 } from "@/lib/sentry/options";
 
 export async function register() {
-  if (isSentryEnabled()) {
-    if (process.env.NEXT_RUNTIME === "nodejs") {
-      Sentry.init(getServerSentryOptions());
-    }
+  try {
+    if (isSentryEnabled()) {
+      if (process.env.NEXT_RUNTIME === "nodejs") {
+        Sentry.init(getServerSentryOptions());
+      }
 
-    if (process.env.NEXT_RUNTIME === "edge") {
-      Sentry.init(getEdgeSentryOptions());
+      if (process.env.NEXT_RUNTIME === "edge") {
+        Sentry.init(getEdgeSentryOptions());
+      }
     }
+  } catch (err) {
+    console.error("[instrumentation] Sentry init failed", err);
   }
 
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
@@ -29,11 +33,21 @@ export async function register() {
     return;
   }
 
-  const { assertServerEnv } = await import("@/lib/env");
-  assertServerEnv();
+  try {
+    const { assertServerEnv } = await import("@/lib/env");
+    assertServerEnv();
+  } catch (err) {
+    console.error("[instrumentation] env check failed", err);
+  }
 }
 
 /** Captures errors from Server Components, middleware, and route handlers. */
 export const onRequestError = isSentryEnabled()
-  ? Sentry.captureRequestError
+  ? (...args: Parameters<typeof Sentry.captureRequestError>) => {
+      try {
+        return Sentry.captureRequestError(...args);
+      } catch (err) {
+        console.error("[instrumentation] captureRequestError failed", err);
+      }
+    }
   : undefined;

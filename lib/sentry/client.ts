@@ -7,20 +7,36 @@ let initialized = false;
 export function initSentryClient(): void {
   if (initialized || !isSentryEnabled()) return;
 
-  const options = getClientSentryOptions();
-  if (options.enabled === false) return;
+  try {
+    const options = getClientSentryOptions();
+    if (options.enabled === false) return;
 
-  Sentry.init({
-    ...options,
-    integrations: [
-      Sentry.replayIntegration({
-        maskAllText: true,
-        blockAllMedia: true,
-      }),
-    ],
-  });
+    Sentry.init({
+      ...options,
+      integrations: [
+        Sentry.replayIntegration({
+          maskAllText: true,
+          blockAllMedia: true,
+        }),
+      ],
+    });
 
-  initialized = true;
+    initialized = true;
+  } catch (err) {
+    console.error("[sentry] client init failed", err);
+  }
+}
+
+/** Safe export for instrumentation-client — undefined when Sentry is off or init failed. */
+export function getRouterTransitionCapture():
+  | typeof Sentry.captureRouterTransitionStart
+  | undefined {
+  if (!initialized || !isSentryEnabled()) return undefined;
+  try {
+    return Sentry.captureRouterTransitionStart;
+  } catch {
+    return undefined;
+  }
 }
 
 export { Sentry };
