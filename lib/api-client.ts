@@ -8,25 +8,30 @@ export async function apiFetch<T = unknown>(
 ): Promise<{ ok: boolean; status: number; data: T }> {
   const { json, headers, ...rest } = options;
 
-  const response = await fetch(path, {
-    ...rest,
-    credentials: "include",
-    headers: {
-      ...(json ? { "Content-Type": "application/json" } : {}),
-      ...headers,
-    },
-    body: json !== undefined ? JSON.stringify(json) : rest.body,
-  });
+  try {
+    const response = await fetch(path, {
+      ...rest,
+      credentials: "include",
+      headers: {
+        ...(json ? { "Content-Type": "application/json" } : {}),
+        ...headers,
+      },
+      body: json !== undefined ? JSON.stringify(json) : rest.body,
+    });
 
-  let data: T;
-  const contentType = response.headers.get("content-type") || "";
-  if (contentType.includes("application/json")) {
-    data = (await response.json()) as T;
-  } else {
-    data = (await response.blob()) as T;
+    let data: T;
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("application/json")) {
+      data = (await response.json()) as T;
+    } else {
+      data = (await response.blob()) as T;
+    }
+
+    return { ok: response.ok, status: response.status, data };
+  } catch (err) {
+    console.error("[api-client]", path, err);
+    return { ok: false, status: 0, data: {} as T };
   }
-
-  return { ok: response.ok, status: response.status, data };
 }
 
 export const api = {

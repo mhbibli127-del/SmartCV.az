@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createOrUpdateUser } from "@/lib/users";
 import { signSessionToken } from "@/lib/token";
 import { generateOTP } from "@/lib/otp";
 import { getLocalDb, saveLocalDb } from "@/lib/db";
 import { sendOtpEmail } from "@/lib/email";
-import { setAuthStateCookie } from "@/lib/auth-cookie";
+import {
+  cookieSecureFromRequest,
+  setAuthStateCookie,
+  sessionCookieOptions,
+} from "@/lib/auth-cookie";
 import { handleApiError, tooManyRequests } from "@/lib/api-errors";
 import { clientRateLimitKey, rateLimit } from "@/lib/rate-limit";
 
@@ -12,8 +16,9 @@ export const dynamic = "force-dynamic";
 
 const PRE_VERIFICATION_TTL = 60 * 60; // 1 hour for pending OTP flow
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const secure = cookieSecureFromRequest(request);
     const limit = rateLimit(clientRateLimitKey(request, "auth:register"), 6, 60 * 60_000);
     if (!limit.ok) {
       return tooManyRequests(limit.retryAfterSec);
@@ -72,14 +77,12 @@ export async function POST(request: Request) {
       redirect: `/verify-otp?email=${encodeURIComponent(email)}`,
     });
 
-    response.cookies.set("token", token, {
-      httpOnly: true,
-      path: "/",
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: PRE_VERIFICATION_TTL,
-    });
-    setAuthStateCookie(response, PRE_VERIFICATION_TTL);
+    response.cookies.set(
+      "token",
+      token,
+      sessionCookieOptions(secure, PRE_VERIFICATION_TTL)
+    );
+    setAuthStateCookie(response, PRE_VERIFICATION_TTL, secure);
 
     return response;
   } catch (error) {

@@ -19,6 +19,7 @@ interface EditorToolbarProps {
   onExport: () => void;
   saving: boolean;
   exporting: boolean;
+  exportDisabled?: boolean;
 }
 
 function EditorToolbarInner({
@@ -28,6 +29,7 @@ function EditorToolbarInner({
   onExport,
   saving,
   exporting,
+  exportDisabled,
 }: EditorToolbarProps) {
   const template = useCvEditorStore((s) => s.template);
   const switchTemplate = useCvEditorStore((s) => s.switchTemplate);
@@ -120,8 +122,8 @@ function EditorToolbarInner({
         <button
           type="button"
           onClick={onSave}
-          disabled={saving}
-          className="hidden items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50 sm:flex"
+          disabled={saving || exportDisabled}
+          className="hidden items-center gap-1.5 rounded-lg border border-zinc-200 px-3 py-1.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex"
         >
           <Save className="h-4 w-4" />
           Save
@@ -130,8 +132,9 @@ function EditorToolbarInner({
         <button
           type="button"
           onClick={onExport}
-          disabled={exporting}
-          className="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+          disabled={exporting || exportDisabled}
+          title={exportDisabled ? "Waiting for canvas…" : "Download PDF"}
+          className="flex items-center gap-1.5 rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Download className="h-4 w-4" />
           <span className="hidden sm:inline">Download PDF</span>

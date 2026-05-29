@@ -6,6 +6,11 @@
  */
 
 import { isBuildPhase } from "@/lib/build";
+import {
+  getPostHogKey,
+  isPostHogConfigured,
+  isPostHogExplicitlyEnabled,
+} from "@/lib/utils/analytics/env";
 
 function sqliteFileUrl(relativeFile: string): string {
   const normalized = relativeFile.replace(/^\.\//, "");
@@ -70,15 +75,7 @@ export function isCloudinaryConfigured(): boolean {
   );
 }
 
-export function getPostHogKey(): string | null {
-  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim();
-  if (!key || isPlaceholder(key)) return null;
-  return key;
-}
-
-export function isPostHogConfigured(): boolean {
-  return Boolean(getPostHogKey());
-}
+export { getPostHogKey, isPostHogConfigured, isPostHogExplicitlyEnabled };
 
 export function getLeonardoApiKey(): string | null {
   return readSecret("LEONARDO_API_KEY");

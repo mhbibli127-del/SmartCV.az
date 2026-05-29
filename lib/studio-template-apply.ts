@@ -106,10 +106,16 @@ export function preserveTextContent(
       .filter((el) => el.text || el.content)
       .map((el) => [el.id, el.text ?? el.content ?? ""])
   );
+  const srcById = new Map(
+    current
+      .filter((el) => el.type === "image" && el.src?.trim())
+      .map((el) => [el.id, el.src!])
+  );
   return built.map((el) => ({
     ...el,
     text: textById.get(el.id) ?? el.text,
     content: textById.get(el.id) ?? el.content,
+    src: srcById.get(el.id) ?? el.src,
   }));
 }
 

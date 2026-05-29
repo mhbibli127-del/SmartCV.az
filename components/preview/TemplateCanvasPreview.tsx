@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CvEditorTemplate } from "@/types/cv-editor";
 import {
   A4_HEIGHT,
@@ -9,6 +9,7 @@ import {
   canvasBackground,
 } from "@/lib/cv-editor/template-catalog";
 import { PreviewElement } from "@/components/preview/PreviewElement";
+import { waitForImages } from "@/lib/wait-for-images";
 import { cn } from "@/lib/utils";
 
 interface TemplateCanvasPreviewProps {
@@ -26,7 +27,9 @@ function TemplateCanvasPreviewInner({
   showShadow = true,
 }: TemplateCanvasPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const paperRef = useRef<HTMLDivElement>(null);
   const [fitScale, setFitScale] = useState(0.28);
+  const [isReady, setIsReady] = useState(false);
 
   const elements = useMemo(() => buildElementsFromTemplate(template), [template]);
   const background = useMemo(() => canvasBackground(template), [template]);
@@ -47,6 +50,20 @@ function TemplateCanvasPreviewInner({
     return () => observer.disconnect();
   }, [scaleOverride, template.id]);
 
+  useEffect(() => {
+    setIsReady(false);
+    if (!paperRef.current) return;
+
+    let cancelled = false;
+    void waitForImages(paperRef.current, 200).then(() => {
+      if (!cancelled) setIsReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [template.id]);
+
   return (
     <div
       ref={containerRef}
@@ -56,8 +73,16 @@ function TemplateCanvasPreviewInner({
       )}
       style={{ aspectRatio: `${A4_WIDTH} / ${A4_HEIGHT}` }}
     >
+      {!isReady && (
+        <div className="absolute inset-0 z-10 animate-pulse bg-zinc-200/80" aria-hidden />
+      )}
       <div
-        className={cn("absolute left-0 top-0 origin-top-left", showShadow && "shadow-lg")}
+        ref={paperRef}
+        className={cn(
+          "absolute left-0 top-0 origin-top-left transition-opacity duration-200",
+          showShadow && "shadow-lg",
+          isReady ? "opacity-100" : "opacity-0"
+        )}
         style={{
           width: A4_WIDTH,
           height: A4_HEIGHT,

@@ -4,6 +4,7 @@ import {
   forwardRef,
   memo,
   useCallback,
+  useEffect,
   useImperativeHandle,
   useRef,
 } from "react";
@@ -13,14 +14,16 @@ import { cn } from "@/lib/utils";
 
 export interface EditorCanvasHandle {
   getPaperElement: () => HTMLElement | null;
+  isReady: () => boolean;
 }
 
 interface EditorCanvasProps {
   className?: string;
+  onReady?: () => void;
 }
 
 function EditorCanvasInner(
-  { className }: EditorCanvasProps,
+  { className, onReady }: EditorCanvasProps,
   ref: React.Ref<EditorCanvasHandle>
 ) {
   const paperRef = useRef<HTMLDivElement>(null);
@@ -32,7 +35,37 @@ function EditorCanvasInner(
 
   useImperativeHandle(ref, () => ({
     getPaperElement: () => paperRef.current,
+    isReady: () =>
+      Boolean(
+        paperRef.current &&
+          paperRef.current.offsetWidth > 0 &&
+          paperRef.current.offsetHeight > 0
+      ),
   }));
+
+  useEffect(() => {
+    if (!onReady) return;
+
+    let cancelled = false;
+    let frame = 0;
+
+    const notifyWhenReady = () => {
+      if (cancelled) return;
+      const paper = paperRef.current;
+      if (paper && paper.offsetWidth > 0 && paper.offsetHeight > 0) {
+        onReady();
+        return;
+      }
+      frame = requestAnimationFrame(notifyWhenReady);
+    };
+
+    frame = requestAnimationFrame(notifyWhenReady);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [onReady, elements.length]);
 
   const handleBackgroundClick = useCallback(() => {
     selectElement(null);

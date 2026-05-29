@@ -45,6 +45,7 @@ const nextConfig = {
       { protocol: "https", hostname: "api.dicebear.com" },
       { protocol: "https", hostname: "**.googleusercontent.com" },
       { protocol: "https", hostname: "res.cloudinary.com" },
+      { protocol: "https", hostname: "images.unsplash.com" },
     ],
   },
   webpack: (config, { isServer }) => {

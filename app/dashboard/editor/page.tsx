@@ -13,6 +13,8 @@ import { useCvEditorAutosave } from "@/hooks/useCvEditorAutosave";
 import { useToast } from "@/components/ui/use-toast";
 import { SkeletonEditor } from "@/components/ui/skeleton";
 import { useAnalytics } from "@/lib/analytics";
+import { waitForCanvasReady } from "@/lib/canvas-ready";
+import { useCanvasReady } from "@/hooks/useCanvasReady";
 import type { EditorCanvasState } from "@/types/cv-document";
 
 function EditorPageContent() {
@@ -40,6 +42,7 @@ function EditorPageContent() {
   const { success, error: toastError } = useToast();
   const { trackPageView } = useAnalytics();
   const { persist } = useCvEditorAutosave(title, !loading && elements.length > 0);
+  const isCanvasReady = useCanvasReady(canvasRef, !loading && elements.length > 0);
 
   useEffect(() => {
     trackPageView("/dashboard/editor");
@@ -177,9 +180,15 @@ function EditorPageContent() {
   ]);
 
   const handleSave = async () => {
+    if (!isCanvasReady) {
+      toastError("Save failed", "Canvas not ready yet.");
+      return;
+    }
+
     setSaving(true);
     try {
-      const paper = canvasRef.current?.getPaperElement();
+      const editor = await waitForCanvasReady(canvasRef);
+      const paper = editor.getPaperElement();
       if (!paper) throw new Error("Canvas not ready");
       const assets = await captureCanvasForSave(paper);
       await persist(assets);
@@ -192,9 +201,15 @@ function EditorPageContent() {
   };
 
   const handleExport = useCallback(async () => {
+    if (!isCanvasReady) {
+      toastError("Export failed", "Canvas not ready yet.");
+      return;
+    }
+
     setExporting(true);
     try {
-      const paper = canvasRef.current?.getPaperElement();
+      const editor = await waitForCanvasReady(canvasRef);
+      const paper = editor.getPaperElement();
       if (!paper) throw new Error("Canvas not ready");
 
       const assets = await captureCanvasForSave(paper);
@@ -243,8 +258,10 @@ function EditorPageContent() {
     }
   }, [
     background,
+    canvasRef,
     cvId,
     elements,
+    isCanvasReady,
     setCvId,
     success,
     template,
@@ -263,6 +280,7 @@ function EditorPageContent() {
       onExport={handleExport}
       saving={saving}
       exporting={exporting}
+      exportDisabled={!isCanvasReady}
     />
   );
 }

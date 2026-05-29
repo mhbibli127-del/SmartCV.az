@@ -1,6 +1,3 @@
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
-
 export interface CanvasCaptureResult {
   thumbnailDataUrl: string;
   pdfBase64: string;
@@ -9,9 +6,18 @@ export interface CanvasCaptureResult {
 export async function captureCanvasForSave(
   element: HTMLElement
 ): Promise<CanvasCaptureResult> {
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import("html2canvas"),
+    import("jspdf"),
+  ]);
+  const { waitForImages } = await import("@/lib/wait-for-images");
+
+  await waitForImages(element, 500);
+
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,
+    allowTaint: false,
     logging: false,
     backgroundColor: "#ffffff",
   });

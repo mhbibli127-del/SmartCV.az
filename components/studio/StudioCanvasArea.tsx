@@ -28,9 +28,10 @@ const CanvasEditor = dynamic(
 interface StudioCanvasAreaProps {
   canvasRef: React.RefObject<CanvasEditorHandle>;
   zoom: number;
+  onCanvasReady?: () => void;
 }
 
-function StudioCanvasAreaInner({ canvasRef, zoom }: StudioCanvasAreaProps) {
+function StudioCanvasAreaInner({ canvasRef, zoom, onCanvasReady }: StudioCanvasAreaProps) {
   const showRulers = useEditorStore((s) => s.showRulers);
   const activePage = useEditorStore((s) => s.activePage);
   const pageCount = useEditorStore((s) => s.pageCount);
@@ -63,7 +64,7 @@ function StudioCanvasAreaInner({ canvasRef, zoom }: StudioCanvasAreaProps) {
                   "0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.12), 0 24px 48px rgba(0,0,0,0.08)",
               }}
             >
-              <CanvasEditor ref={canvasRef} embedded zoom={zoom} />
+              <CanvasEditor ref={canvasRef} embedded zoom={zoom} onReady={onCanvasReady} />
             </div>
           </div>
           {pageCount > 1 && (

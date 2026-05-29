@@ -33,7 +33,7 @@ function formatUpdatedAt(iso: string): string {
   if (diffDays === 0) return "Updated today";
   if (diffDays === 1) return "Updated yesterday";
   if (diffDays < 7) return `Updated ${diffDays} days ago`;
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
@@ -112,7 +112,9 @@ function ResumeCardInner({
           <p className="mt-0.5 truncate text-xs text-zinc-500">
             {resume.templateName ?? "Custom template"}
           </p>
-          <p className="mt-1 text-[11px] text-zinc-400">{formatUpdatedAt(resume.updatedAt)}</p>
+          <p className="mt-1 text-[11px] text-zinc-400" suppressHydrationWarning>
+            {formatUpdatedAt(resume.updatedAt)}
+          </p>
         </div>
 
         <div className="flex items-center justify-between gap-2">

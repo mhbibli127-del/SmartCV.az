@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clearAuthStateCookie } from "@/lib/auth-cookie";
+import {
+  clearAuthStateCookie,
+  clearSessionCookieOptions,
+  cookieSecureFromRequest,
+} from "@/lib/auth-cookie";
 
 const AUTH_COOKIES = [
   "token",
@@ -11,26 +15,23 @@ const AUTH_COOKIES = [
   "__Secure-next-auth.callback-url",
 ] as const;
 
-function clearAuthCookies(res: NextResponse) {
+function clearAuthCookies(res: NextResponse, secure: boolean) {
+  const opts = clearSessionCookieOptions(secure);
   for (const name of AUTH_COOKIES) {
-    res.cookies.set(name, "", {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: 0,
-    });
+    res.cookies.set(name, "", opts);
   }
-  clearAuthStateCookie(res);
+  clearAuthStateCookie(res, secure);
   return res;
 }
 
 export async function GET(request: NextRequest) {
+  const secure = cookieSecureFromRequest(request);
   const loginUrl = new URL("/login", request.url);
   const res = NextResponse.redirect(loginUrl);
-  return clearAuthCookies(res);
+  return clearAuthCookies(res, secure);
 }
 
-export async function POST() {
-  return clearAuthCookies(NextResponse.json({ success: true }));
+export async function POST(request: NextRequest) {
+  const secure = cookieSecureFromRequest(request);
+  return clearAuthCookies(NextResponse.json({ success: true }), secure);
 }

@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
-import posthog from "posthog-js";
+import { useEffect, useState, type ReactNode } from "react";
 import { PostHogProvider } from "posthog-js/react";
 import {
-  getPostHogHost,
-  getPostHogKey,
+  getPostHogInstance,
+  initPostHog,
+} from "@/lib/analytics/posthog";
+import {
   isAnalyticsOptedOut,
   isPostHogConfigured,
 } from "@/lib/utils/analytics/env";
@@ -15,29 +16,34 @@ interface PostHogAnalyticsProviderProps {
 }
 
 /**
- * SSR-safe PostHog wrapper — init + provider only.
- * Session identify/pageviews run inside AuthProvider via PostHogSessionBridge.
+ * SSR-safe PostHog wrapper — lazy init + provider only when configured.
  */
 export function PostHogAnalyticsProvider({ children }: PostHogAnalyticsProviderProps) {
+  const [ready, setReady] = useState(false);
+  const configured = isPostHogConfigured();
+
   useEffect(() => {
-    if (!isPostHogConfigured() || isAnalyticsOptedOut()) return;
-    if (posthog.__loaded) return;
+    if (!configured || isAnalyticsOptedOut()) return;
 
-    posthog.init(getPostHogKey()!, {
-      api_host: getPostHogHost(),
-      person_profiles: "identified_only",
-      capture_pageview: false,
-      capture_pageleave: true,
-      autocapture: false,
-      persistence: "localStorage+cookie",
-      disable_session_recording: process.env.NODE_ENV === "development",
-      respect_dnt: true,
+    if (getPostHogInstance()?.__loaded) {
+      setReady(true);
+      return;
+    }
+
+    void initPostHog({
+      onLoaded: () => setReady(true),
+      onFailed: () => {
+        getPostHogInstance()?.opt_out_capturing();
+        setReady(false);
+      },
     });
-  }, []);
+  }, [configured]);
 
-  if (!isPostHogConfigured()) {
+  const client = ready ? getPostHogInstance() : null;
+
+  if (!configured || !client) {
     return <>{children}</>;
   }
 
-  return <PostHogProvider client={posthog}>{children}</PostHogProvider>;
+  return <PostHogProvider client={client}>{children}</PostHogProvider>;
 }

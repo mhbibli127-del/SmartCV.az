@@ -4,7 +4,6 @@ import TemplateCatalog from '@/app/dashboard/builder/templatecatalog';
 import CVFormSection from '@/app/dashboard/builder/cvFormSection';
 import Link from "next/link";
 import { Download, RefreshCw, Wand2, Palette, FormInput, Save, Check, ArrowUpRight } from 'lucide-react';
-import { generatePDF } from '@/lib/pdfGenerator';
 import { useToast } from '@/components/ui/use-toast';
 import { api } from '@/lib/api-client';
 import { PageShell, PageHeader, Surface } from '@/components/ui/page-shell';
@@ -136,9 +135,10 @@ export default function CVGeneratorPage() {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (generatedCV) {
       try {
+        const { generatePDF } = await import("@/lib/pdfGenerator");
         const { pdfBase64, fileName } = generatePDF(generatedCV, config.color || '#000000');
         
         // Client-side download

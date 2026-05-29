@@ -2,7 +2,7 @@ import type { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { findUserByEmail } from "@/lib/users";
 import { signSessionToken } from "@/lib/token";
-import { setAuthStateCookie } from "@/lib/auth-cookie";
+import { setAuthStateCookie, sessionCookieOptions } from "@/lib/auth-cookie";
 import { upsertSaasUserOnAuth } from "@/lib/saas-user";
 
 export const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
@@ -93,19 +93,14 @@ export async function ensureGoogleUser(
 /** Issue JWT + auth_state cookies so all legacy API routes work after Google OAuth. */
 export function attachSessionCookies(
   response: NextResponse,
-  email: string
+  email: string,
+  secure: boolean
 ): NextResponse {
   const normalized = email.toLowerCase().trim();
   const token = signSessionToken({ email: normalized, verified: true });
 
-  response.cookies.set("token", token, {
-    httpOnly: true,
-    path: "/",
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_MAX_AGE,
-  });
-  setAuthStateCookie(response, SESSION_MAX_AGE);
+  response.cookies.set("token", token, sessionCookieOptions(secure, SESSION_MAX_AGE));
+  setAuthStateCookie(response, SESSION_MAX_AGE, secure);
 
   return response;
 }

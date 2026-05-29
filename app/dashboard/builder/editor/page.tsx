@@ -26,6 +26,15 @@ import { EditorRulers } from "@/components/editor/EditorRulers";
 import { LiveblocksRoom } from "@/components/realtime/LiveblocksRoom";
 import { SkeletonEditor } from "@/components/ui/skeleton";
 import type { CanvasEditorHandle } from "@/components/editor/CanvasEditor";
+import { waitForCanvasReady } from "@/lib/canvas-ready";
+import { useCanvasReady } from "@/hooks/useCanvasReady";
+import {
+  captureKonvaActivePageFromEditor,
+  captureKonvaPagesFromEditor,
+  downloadBlob,
+  exportKonvaDataUrl,
+  exportKonvaPdf,
+} from "@/lib/studio-export";
 
 const CanvasEditor = dynamic(
   () => import("@/components/editor/CanvasEditor").then((m) => m.CanvasEditor),
@@ -49,6 +58,9 @@ function VisualEditorContent() {
   const loadElements = useEditorStore((s) => s.loadElements);
   const elements = useEditorStore((s) => s.elements);
   const markSaved = useEditorStore((s) => s.markSaved);
+  const selectElement = useEditorStore((s) => s.selectElement);
+  const setExporting = useEditorStore((s) => s.setExporting);
+  const setEditingId = useEditorStore((s) => s.setEditingId);
   const setTemplate = useDesignStore((s) => s.setTemplate);
   const hydrateDesign = useDesignStore((s) => s.hydrateDesign);
   const activeTheme = useDesignStore((s) => s.activeTheme);
@@ -64,7 +76,30 @@ function VisualEditorContent() {
   const { trackPageView } = useAnalytics();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExportingLocal] = useState(false);
   const [title, setTitle] = useState("Untitled CV");
+  const isCanvasReady = useCanvasReady(canvasRef, !loading && elements.length > 0);
+
+  const getCanvasImageSources = useCallback(
+    () =>
+      useEditorStore
+        .getState()
+        .elements.filter((el) => el.type === "image" && el.src?.trim())
+        .map((el) => el.src!.trim()),
+    []
+  );
+
+  const beginExport = useCallback(() => {
+    selectElement(null);
+    setEditingId(null);
+    setExporting(true);
+    setExportingLocal(true);
+  }, [selectElement, setEditingId, setExporting]);
+
+  const endExport = useCallback(() => {
+    setExporting(false);
+    setExportingLocal(false);
+  }, [setExporting]);
 
   useEffect(() => {
     trackPageView("/dashboard/builder/editor");
@@ -164,36 +199,46 @@ function VisualEditorContent() {
     }
   };
 
-  const handleExportPng = () => {
-    const dataUrl = canvasRef.current?.exportPng();
-    if (!dataUrl) {
-      toastError("Export failed", "Canvas not ready.");
+  const handleExportPng = async () => {
+    if (!isCanvasReady) {
+      toastError("Export failed", "Canvas not ready yet.");
       return;
     }
-    const a = document.createElement("a");
-    a.href = dataUrl;
-    a.download = `${title.replace(/\s+/g, "_")}.png`;
-    a.click();
-    success("Exported", "PNG downloaded.");
+
+    beginExport();
+    try {
+      const editor = await waitForCanvasReady(canvasRef);
+      const dataUrl = await captureKonvaActivePageFromEditor(
+        editor,
+        useEditorStore.getState().activePage,
+        getCanvasImageSources()
+      );
+      const result = await exportKonvaDataUrl(dataUrl, "png", title);
+      downloadBlob(result.blob, result.filename);
+      success("Exported", "PNG downloaded.");
+    } catch (err) {
+      toastError(
+        "Export failed",
+        err instanceof Error ? err.message : "Canvas not ready."
+      );
+    } finally {
+      endExport();
+    }
   };
 
   const handleExport = async () => {
+    if (!isCanvasReady) {
+      toastError("Export failed", "Canvas not ready yet.");
+      return;
+    }
+
+    beginExport();
     try {
-      const canvas = getCanvasStateFromStore();
-      const res = await fetch("/api/cv/export", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cvData: { canvas, mode: "visual" }, title }),
-      });
-      if (!res.ok) throw new Error("Export failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${title.replace(/\s+/g, "_")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const editor = await waitForCanvasReady(canvasRef);
+      const dataUrls = await captureKonvaPagesFromEditor(editor, getCanvasImageSources());
+      const result = await exportKonvaPdf(dataUrls, title);
+      downloadBlob(result.blob, result.filename);
+
       if (cvId) {
         await fetch("/api/cv/complete", {
           method: "POST",
@@ -203,8 +248,13 @@ function VisualEditorContent() {
         });
       }
       success("Exported", "PDF downloaded.");
-    } catch {
-      toastError("Export failed", "Could not generate PDF.");
+    } catch (err) {
+      toastError(
+        "Export failed",
+        err instanceof Error ? err.message : "Could not generate PDF."
+      );
+    } finally {
+      endExport();
     }
   };
 
@@ -232,6 +282,7 @@ function VisualEditorContent() {
         onExport={handleExport}
         onExportPng={handleExportPng}
         saving={saving}
+        exportDisabled={!isCanvasReady || exporting}
       />
 
       <CollabBar presence={presence} connected={connected} enabled={Boolean(cvId)} />

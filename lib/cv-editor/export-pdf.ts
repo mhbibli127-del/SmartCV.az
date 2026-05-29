@@ -1,13 +1,20 @@
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
+import { waitForImages } from "@/lib/wait-for-images";
 
 export async function exportCanvasToPdf(
   element: HTMLElement,
   filename: string
 ): Promise<void> {
+  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+    import("html2canvas"),
+    import("jspdf"),
+  ]);
+
+  await waitForImages(element, 500);
+
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,
+    allowTaint: false,
     logging: false,
     backgroundColor: "#ffffff",
   });

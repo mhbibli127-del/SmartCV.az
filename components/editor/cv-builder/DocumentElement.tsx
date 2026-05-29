@@ -3,6 +3,8 @@
 import { memo, useCallback, useRef, useEffect } from "react";
 import type { CvEditorElement } from "@/types/cv-editor";
 import { useCvEditorStore } from "@/store/cv-editor-store";
+import { CvExportImage } from "@/components/cv/CvExportImage";
+import { resolveImageSrc } from "@/lib/cv-editor/template-images";
 import { cn } from "@/lib/utils";
 
 interface DocumentElementProps {
@@ -66,27 +68,12 @@ function DocumentElementInner({ element }: DocumentElementProps) {
   if (element.type === "image") {
     return (
       <div style={boxStyle}>
-        {element.src ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={element.src}
-            alt=""
-            className="h-full w-full object-cover"
-            style={{ borderRadius: style.borderRadius }}
-            draggable={false}
-          />
-        ) : (
-          <div
-            className="flex h-full w-full items-center justify-center text-xs text-white/80"
-            style={{
-              background: style.background ?? "#71717a",
-              borderRadius: style.borderRadius,
-              opacity: style.opacity ?? 1,
-            }}
-          >
-            Photo
-          </div>
-        )}
+        <CvExportImage
+          src={resolveImageSrc(element.src)}
+          style={{ borderRadius: style.borderRadius, opacity: style.opacity ?? 1 }}
+          placeholderClassName="text-white/80"
+          placeholderLabel="Photo"
+        />
       </div>
     );
   }

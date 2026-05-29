@@ -15,6 +15,7 @@ export interface SaveResumeAssets {
 
 export function useCvEditorAutosave(title: string, enabled = true) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistRef = useRef<(assets?: SaveResumeAssets) => Promise<void>>(async () => {});
   const elements = useCvEditorStore((s) => s.elements);
   const background = useCvEditorStore((s) => s.background);
   const template = useCvEditorStore((s) => s.template);
@@ -85,18 +86,22 @@ export function useCvEditorAutosave(title: string, enabled = true) {
     ]
   );
 
+  persistRef.current = persist;
+
   useEffect(() => {
     if (!enabled || elements.length === 0) return;
 
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      void persist().catch(() => {});
+      void persistRef.current().catch((err) => {
+        console.error("[cv-editor/autosave]", err);
+      });
     }, DEBOUNCE_MS);
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [elements, background, title, enabled, persist]);
+  }, [elements, background, title, enabled]);
 
   return { persist };
 }

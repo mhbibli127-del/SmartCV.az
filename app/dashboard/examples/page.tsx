@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Search, Plus, Sparkles } from "lucide-react";
@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 24;
 
-export default function ExamplesPage() {
+function ExamplesPageContent() {
   const searchParams = useSearchParams();
   const [resumes, setResumes] = useState<PublishedResumeItem[]>([]);
   const [categories, setCategories] = useState<string[]>(["All"]);
@@ -184,5 +184,13 @@ export default function ExamplesPage() {
 
       <PublishedResumePreviewModal resume={preview} onClose={() => setPreview(null)} />
     </PageShell>
+  );
+}
+
+export default function ExamplesPage() {
+  return (
+    <Suspense fallback={<LoadingState label="Loading community resumes…" />}>
+      <ExamplesPageContent />
+    </Suspense>
   );
 }

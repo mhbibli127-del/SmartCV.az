@@ -25,6 +25,7 @@ declare namespace NodeJS {
     CLOUDINARY_API_KEY?: string;
     CLOUDINARY_API_SECRET?: string;
     NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME?: string;
+    NEXT_PUBLIC_POSTHOG_ENABLED?: string;
     NEXT_PUBLIC_POSTHOG_KEY?: string;
     NEXT_PUBLIC_POSTHOG_HOST?: string;
     SENTRY_DSN?: string;

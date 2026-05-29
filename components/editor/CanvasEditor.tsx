@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useRef, forwardRef, useImperativeHandle } from "react";
+import { memo, useCallback, useRef, forwardRef, useImperativeHandle, useEffect } from "react";
 import { Stage, Layer, Rect } from "react-konva";
 import type Konva from "konva";
 import { ElementLayer } from "./ElementLayer";
@@ -20,15 +20,17 @@ export type CanvasEditorHandle = {
   getPaperElement: () => HTMLElement | null;
   preparePage: (page: number) => Promise<void>;
   getPageCount: () => number;
+  isReady: () => boolean;
 };
 
 interface CanvasEditorProps {
   embedded?: boolean;
   zoom?: number;
+  onReady?: () => void;
 }
 
 function CanvasEditorInner(
-  { embedded = false, zoom = 1 }: CanvasEditorProps,
+  { embedded = false, zoom = 1, onReady }: CanvasEditorProps,
   ref: React.Ref<CanvasEditorHandle>
 ) {
   useEditorKeyboardShortcuts();
@@ -56,7 +58,12 @@ function CanvasEditorInner(
   );
 
   useImperativeHandle(ref, () => ({
-    exportPng: () => stageRef.current?.toDataURL({ pixelRatio: 2 }) ?? null,
+    exportPng: () => {
+      const stage = stageRef.current;
+      if (!stage || !paperRef.current) return null;
+      stage.batchDraw();
+      return stage.toDataURL({ pixelRatio: 2 }) ?? null;
+    },
     getPaperElement: () => paperRef.current,
     preparePage: async (page: number) => {
       useEditorStore.getState().setActivePage(page);
@@ -65,7 +72,40 @@ function CanvasEditorInner(
       });
     },
     getPageCount: () => useEditorStore.getState().pageCount,
+    isReady: () =>
+      Boolean(
+        paperRef.current &&
+          stageRef.current &&
+          paperRef.current.offsetWidth > 0 &&
+          paperRef.current.offsetHeight > 0
+      ),
   }));
+
+  useEffect(() => {
+    if (!onReady) return;
+
+    let cancelled = false;
+    let frame = 0;
+
+    const notifyWhenReady = () => {
+      if (cancelled) return;
+      const paper = paperRef.current;
+      const stage = stageRef.current;
+      if (paper && stage && paper.offsetWidth > 0 && paper.offsetHeight > 0) {
+        stage.batchDraw();
+        onReady();
+        return;
+      }
+      frame = requestAnimationFrame(notifyWhenReady);
+    };
+
+    frame = requestAnimationFrame(notifyWhenReady);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [onReady, elements.length]);
 
   const paper = (
     <div

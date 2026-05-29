@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { toast as hotToast, type ToastOptions } from 'react-hot-toast';
 
 type ToastVariant = 'default' | 'success' | 'error';
@@ -19,7 +20,7 @@ function renderContent(title?: string, description?: string) {
 }
 
 export function useToast() {
-  const toast = (props: ToastProps) => {
+  const toast = useCallback((props: ToastProps) => {
     const { title, description, variant = 'default', ...rest } = props;
     const content = renderContent(title, description) ?? title ?? description ?? '';
 
@@ -30,13 +31,19 @@ export function useToast() {
       return hotToast.error(content, rest);
     }
     return hotToast(content, rest);
-  };
+  }, []);
 
-  return {
-    toast,
-    success: (title: string, description?: string) =>
+  const success = useCallback(
+    (title: string, description?: string) =>
       toast({ title, description, variant: 'success' }),
-    error: (title: string, description?: string) =>
+    [toast]
+  );
+
+  const error = useCallback(
+    (title: string, description?: string) =>
       toast({ title, description, variant: 'error' }),
-  };
+    [toast]
+  );
+
+  return { toast, success, error };
 }

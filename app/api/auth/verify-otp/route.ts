@@ -1,13 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getLocalDb, saveLocalDb } from "@/lib/db";
 import { setUserVerified } from "@/lib/users";
 import { signSessionToken } from "@/lib/token";
-import { setAuthStateCookie } from "@/lib/auth-cookie";
+import {
+  cookieSecureFromRequest,
+  setAuthStateCookie,
+  sessionCookieOptions,
+} from "@/lib/auth-cookie";
 
 const VERIFIED_SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const secure = cookieSecureFromRequest(request);
     const { email: rawEmail, otp } = await request.json();
     const email = String(rawEmail ?? "")
       .trim()
@@ -40,14 +45,12 @@ export async function POST(request: Request) {
       redirect: "/dashboard",
     });
 
-    response.cookies.set("token", token, {
-      httpOnly: true,
-      path: "/",
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: VERIFIED_SESSION_MAX_AGE,
-    });
-    setAuthStateCookie(response, VERIFIED_SESSION_MAX_AGE);
+    response.cookies.set(
+      "token",
+      token,
+      sessionCookieOptions(secure, VERIFIED_SESSION_MAX_AGE)
+    );
+    setAuthStateCookie(response, VERIFIED_SESSION_MAX_AGE, secure);
 
     return response;
   } catch (error: unknown) {

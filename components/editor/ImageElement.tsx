@@ -10,6 +10,8 @@ import {
   getImageCrop,
   imageCornerRadius,
 } from "@/components/editor/image-utils";
+import { preloadImage } from "@/lib/wait-for-images";
+import { resolveImageSrc } from "@/lib/cv-editor/template-images";
 
 type Props = {
   element: EditorElement;
@@ -29,15 +31,16 @@ function ImageElementInner({ element, isSelected, onSelect, disableDrag }: Props
   const radius = imageCornerRadius(element);
 
   useEffect(() => {
-    if (!element.src) {
-      setImage(null);
-      return;
-    }
-    const img = new window.Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => setImage(img);
-    img.onerror = () => setImage(null);
-    img.src = element.src;
+    const url = resolveImageSrc(element.src);
+    let cancelled = false;
+
+    void preloadImage(url).then((img) => {
+      if (!cancelled) setImage(img);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [element.src]);
 
   const handleDragMove = useCallback(
@@ -105,7 +108,7 @@ function ImageElementInner({ element, isSelected, onSelect, disableDrag }: Props
         <Text
           width={element.width}
           height={element.height}
-          text="Upload image"
+          text="Loading…"
           fontSize={12}
           fill="#a1a1aa"
           align="center"

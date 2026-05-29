@@ -22,9 +22,10 @@ type Props = {
   onExport: () => void;
   onExportPng?: () => void;
   saving?: boolean;
+  exportDisabled?: boolean;
 };
 
-function ToolbarInner({ onSave, onExport, onExportPng, saving }: Props) {
+function ToolbarInner({ onSave, onExport, onExportPng, saving, exportDisabled }: Props) {
   const addTextElement = useEditorStore((s) => s.addTextElement);
   const addSectionBlock = useEditorStore((s) => s.addSectionBlock);
   const selectedId = useEditorStore((s) => s.selectedId);
@@ -97,11 +98,11 @@ function ToolbarInner({ onSave, onExport, onExportPng, saving }: Props) {
       <Button variant="outline" size="sm" onClick={onSave} disabled={saving || !isDirty}>
         {saving ? "Saving…" : "Save"}
       </Button>
-      <Button size="sm" onClick={onExport}>
+      <Button size="sm" onClick={onExport} disabled={exportDisabled}>
         Export PDF
       </Button>
       {onExportPng && (
-        <Button variant="outline" size="sm" onClick={onExportPng}>
+        <Button variant="outline" size="sm" onClick={onExportPng} disabled={exportDisabled}>
           PNG
         </Button>
       )}

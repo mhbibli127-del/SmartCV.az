@@ -29,6 +29,7 @@ function CvTemplateThumbnailInner({
         src={src}
         alt={`${template.name} preview`}
         fill
+        unoptimized
         className="object-cover object-top"
         sizes="(max-width: 768px) 100vw, 25vw"
         priority={priority}

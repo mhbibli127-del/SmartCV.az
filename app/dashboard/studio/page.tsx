@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { SkeletonEditor } from "@/components/ui/skeleton";
 import { useStudioAutosave } from "@/components/studio/useStudioAutosave";
 import { useStudioExport } from "@/components/studio/useStudioExport";
+import { useCanvasReady } from "@/hooks/useCanvasReady";
 import { dispatchResumeGalleryUpdate } from "@/lib/resume-gallery-events";
 import type { StudioExportFormat } from "@/lib/studio-export";
 import {
@@ -69,6 +70,7 @@ function StudioEditorContent() {
   const selectedTemplate = useDesignStore((s) => s.selectedTemplate);
   const applyThemeToCanvas = useDesignStore((s) => s.applyThemeToCanvas);
   const canvasRef = useRef<CanvasEditorHandle>(null);
+  const initKeyRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState("Untitled CV");
@@ -77,8 +79,8 @@ function StudioEditorContent() {
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
   const [mobileRightOpen, setMobileRightOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [canvasReady, setCanvasReady] = useState(false);
   const elements = useEditorStore((s) => s.elements);
+  const isCanvasReady = useCanvasReady(canvasRef, !loading && elements.length > 0);
 
   const { exportDocument } = useStudioExport({
     canvasRef,
@@ -86,7 +88,7 @@ function StudioEditorContent() {
     resumeId: cvId,
     template: selectedTemplate,
     templateSlug,
-    canvasReady,
+    canvasReady: isCanvasReady,
     onSuccess: (msg, desc) => success(msg, desc),
     onError: (msg, desc) => toastError(msg, desc),
   });
@@ -138,19 +140,6 @@ function StudioEditorContent() {
     [setTemplate, loadElements, applyThemeToCanvas]
   );
 
-  useEffect(() => {
-    if (loading) {
-      setCanvasReady(false);
-      return;
-    }
-    if (elements.length === 0) {
-      setCanvasReady(false);
-      return;
-    }
-    const t = window.setTimeout(() => setCanvasReady(true), 120);
-    return () => window.clearTimeout(t);
-  }, [loading, elements.length]);
-
   const hydrateFromContent = useCallback(
     (content: ResumeContent, resumeTitle?: string) => {
       const sections = Array.isArray(content.sections) ? content.sections : [];
@@ -176,14 +165,24 @@ function StudioEditorContent() {
   );
 
   useEffect(() => {
+    const initKey = `${cvId ?? "new"}|${templateSlug ?? ""}`;
+    if (initKeyRef.current === initKey) {
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
     const load = async () => {
       if (cvId) {
         try {
           const res = await fetch(`/api/resumes/${cvId}`, { credentials: "include" });
           if (res.ok) {
             const data = await res.json();
+            if (cancelled) return;
             const content = (data.resume?.content ?? { mode: "visual" }) as ResumeContent;
             hydrateFromContent(content, data.resume?.title ?? "Untitled CV");
+            initKeyRef.current = initKey;
             setLoading(false);
             return;
           }
@@ -208,20 +207,29 @@ function StudioEditorContent() {
             activePage: 1,
           });
         }
+        initKeyRef.current = initKey;
         setLoading(false);
         return;
       }
 
       if (templateSlug && !cvId) {
         applyTemplateBySlug(templateSlug);
+        initKeyRef.current = initKey;
         setLoading(false);
         return;
       }
 
       loadElements(createDefaultCanvas().elements);
+      initKeyRef.current = initKey;
       setLoading(false);
     };
+
     void load();
+
+    return () => {
+      cancelled = true;
+      initKeyRef.current = null;
+    };
   }, [cvId, templateSlug, loadElements, hydrateDesign, hydrateFromContent, applyTemplateBySlug]);
 
   const persist = useCallback(async () => {
@@ -299,7 +307,7 @@ function StudioEditorContent() {
         onSave={handleSave}
         onExport={handleExport}
         exporting={exporting}
-        exportDisabled={!canvasReady || elements.length === 0}
+        exportDisabled={!isCanvasReady || elements.length === 0}
         saving={saving}
         templatesOpen={templatesOpen}
         onToggleTemplates={() => setTemplatesOpen((v) => !v)}

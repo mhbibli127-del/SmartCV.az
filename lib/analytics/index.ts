@@ -27,6 +27,14 @@ export {
 
 export { captureAnalyticsEvent, AnalyticsTracker } from "@/lib/analytics/tracker";
 export { captureServerEvent, captureAIUsageServer } from "@/lib/analytics/server";
+export {
+  trackEvent,
+  identifyUser,
+  resetUser,
+  trackButtonClicked,
+  initPostHog,
+  getPostHogInstance,
+} from "@/lib/analytics/posthog";
 export { initPostHogClient, getPostHogClientSync } from "@/lib/analytics/client";
 
 export {

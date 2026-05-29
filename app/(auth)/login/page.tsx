@@ -97,7 +97,8 @@ function LoginForm() {
       }
 
       toast({ title: "Signed in", description: "Redirecting to your dashboard…" });
-      router.push(result.redirect || "/dashboard");
+      const destination = result.redirect || callbackUrl || "/dashboard";
+      window.location.assign(destination);
     } catch {
       setError("Something went wrong during sign-in.");
       toast({ title: "Sign-in error", description: "Please try again." });

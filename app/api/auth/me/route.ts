@@ -5,6 +5,7 @@ import {
   attachSessionCookies,
   ensureGoogleUser,
 } from "@/lib/google-session-bridge";
+import { cookieSecureFromRequest } from "@/lib/auth-cookie";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest) {
       image: ("image" in user ? user.image : null) ?? auth.image ?? null,
     });
 
-    attachSessionCookies(response, email);
+    attachSessionCookies(response, email, cookieSecureFromRequest(req));
 
     return response;
   } catch (error: unknown) {

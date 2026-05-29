@@ -15,7 +15,7 @@ interface PublishedResumeCardProps {
 }
 
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
+  return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -74,7 +74,9 @@ function PublishedResumeCardInner({ resume, onPreview }: PublishedResumeCardProp
         <p className="truncate text-xs text-zinc-500">
           {resume.templateName ?? "Resume template"}
         </p>
-        <p className="text-[11px] text-zinc-400">Published {formatDate(resume.createdAt)}</p>
+        <p className="text-[11px] text-zinc-400" suppressHydrationWarning>
+          Published {formatDate(resume.createdAt)}
+        </p>
       </div>
     </motion.article>
   );

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { createPageMetadata } from "@/lib/seo/metadata";
 
+/** Auth pages: /login, /register, /register/otp, /verify-otp */
 export const metadata = createPageMetadata({
   title: "Sign In",
   description: "Sign in to SmartCV.AZ to build, optimize, and export your CV.",

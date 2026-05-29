@@ -5,6 +5,7 @@ import {
   ensureGoogleUser,
   sanitizeAuthRedirect,
 } from "@/lib/google-session-bridge";
+import { cookieSecureFromRequest } from "@/lib/auth-cookie";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     const next = sanitizeAuthRedirect(req.nextUrl.searchParams.get("next"));
     const response = NextResponse.redirect(new URL(next, req.url));
-    attachSessionCookies(response, auth.email);
+    attachSessionCookies(response, auth.email, cookieSecureFromRequest(req));
 
     return response;
   } catch (err) {

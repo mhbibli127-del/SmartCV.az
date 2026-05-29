@@ -1,16 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const authRoutes = [
-  "/login",
-  "/register",
-  "/verify-otp",
-];
+const AUTH_COMPLETION_PATHS = ["/verify-otp", "/register/otp"];
 
-const protectedRoutes = [
-  "/dashboard",
-  "/admin",
-];
+function isAuthPath(pathname: string): boolean {
+  return (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname === "/verify-otp" ||
+    pathname.startsWith("/register/")
+  );
+}
+
+function isProtectedPath(pathname: string): boolean {
+  return pathname.startsWith("/dashboard") || pathname.startsWith("/admin");
+}
 
 export default function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -21,17 +25,13 @@ export default function middleware(request: NextRequest) {
     request.cookies.get("next-auth.session-token")?.value ||
     request.cookies.get("__Secure-next-auth.session-token")?.value;
 
-  // Email/password sessions require BOTH httpOnly token + client auth_state mirror.
   const hasEmailAuth = Boolean(token && authState === "1");
   const hasOAuth = Boolean(nextAuthSession);
   const isAuthenticated = hasEmailAuth || hasOAuth;
 
-  const isAuthRoute = authRoutes.includes(pathname);
-  const isProtectedRoute = protectedRoutes.some((route) =>
-    pathname.startsWith(route)
-  );
+  const isProtectedRoute = isProtectedPath(pathname);
+  const onAuthRoute = isAuthPath(pathname);
 
-  // Stale auth_state without token → treat as signed out.
   if (authState === "1" && !token && !nextAuthSession && isProtectedRoute) {
     const res = NextResponse.redirect(new URL("/login", request.url));
     res.cookies.set("auth_state", "", { path: "/", maxAge: 0 });
@@ -42,18 +42,18 @@ export default function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (isAuthRoute && isAuthenticated) {
-    // Allow unverified email sessions to stay on /verify-otp.
-    if (pathname === "/verify-otp") {
+  if (onAuthRoute && isAuthenticated) {
+    if (AUTH_COMPLETION_PATHS.includes(pathname)) {
       return NextResponse.next();
     }
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
+  // Logged-in users land on dashboard; guests see the public homepage at app/page.tsx.
   if (pathname === "/") {
     return isAuthenticated
       ? NextResponse.redirect(new URL("/dashboard", request.url))
-      : NextResponse.redirect(new URL("/login", request.url));
+      : NextResponse.next();
   }
 
   return NextResponse.next();
@@ -64,6 +64,7 @@ export const config = {
     "/",
     "/login",
     "/register",
+    "/register/:path*",
     "/verify-otp",
     "/dashboard/:path*",
     "/admin/:path*",

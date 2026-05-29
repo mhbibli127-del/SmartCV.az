@@ -13,6 +13,7 @@ import {
 } from "@/lib/cv-editor/template-definitions";
 import { SAMPLE } from "@/templates/shared";
 import { mergeResumeDataIntoElements } from "@/lib/cv-editor/resume-data";
+import { injectDefaultImageSources } from "@/lib/cv-editor/template-images";
 
 export function getEditorTemplate(slugOrId: string | null): CvEditorTemplate | null {
   if (!slugOrId) return null;
@@ -33,7 +34,7 @@ export function buildElementsFromTemplate(
 
   const elements = buildTemplateElements(slug, template.colors, template.fonts);
   const data = resumeData && Object.keys(resumeData).length ? resumeData : SAMPLE;
-  return mergeResumeDataIntoElements(elements, data);
+  return injectDefaultImageSources(mergeResumeDataIntoElements(elements, data));
 }
 
 

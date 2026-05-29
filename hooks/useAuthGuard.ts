@@ -24,7 +24,6 @@ export function useAuthGuard() {
     if (checked.current || status === "loading") return;
 
     async function verify() {
-      // NextAuth session → bridge to JWT cookies
       if (status === "authenticated") {
         if (!hasAuthStateCookie()) {
           const bridge = await fetch("/api/auth/me", {
@@ -40,7 +39,6 @@ export function useAuthGuard() {
         return;
       }
 
-      // Email/password session
       if (!shouldFetchAuthenticatedApis(status)) {
         router.replace("/login");
         return;
@@ -59,11 +57,20 @@ export function useAuthGuard() {
         return;
       }
 
+      if (!res.ok) {
+        router.replace("/login?reason=session_expired");
+        return;
+      }
+
       checked.current = true;
     }
 
     verify().catch(() => {
-      /* network blip */
+      if (!hasAuthStateCookie() && status !== "authenticated") {
+        router.replace("/login");
+        return;
+      }
+      router.replace("/login?reason=session_expired");
     });
   }, [status, router]);
 }

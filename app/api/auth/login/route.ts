@@ -4,7 +4,7 @@ import { signSessionToken } from "@/lib/token";
 import { generateOTP } from "@/lib/otp";
 import { getLocalDb, saveLocalDb } from "@/lib/db";
 import { sendOtpEmail } from "@/lib/email";
-import { setAuthStateCookie } from "@/lib/auth-cookie";
+import { setAuthStateCookie, cookieSecureFromRequest, sessionCookieOptions } from "@/lib/auth-cookie";
 import { handleApiError, tooManyRequests } from "@/lib/api-errors";
 import { clientRateLimitKey, rateLimit } from "@/lib/rate-limit";
 
@@ -33,6 +33,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const secure = cookieSecureFromRequest(req);
+
     const result = await checkUserCredentials(email, password);
 
     if (!result.ok) {
@@ -59,14 +61,8 @@ export async function POST(req: NextRequest) {
           { status: 403 }
         );
 
-        response.cookies.set("token", token, {
-          httpOnly: true,
-          path: "/",
-          sameSite: "lax",
-          secure: process.env.NODE_ENV === "production",
-          maxAge: 60 * 60,
-        });
-        setAuthStateCookie(response, 60 * 60);
+        response.cookies.set("token", token, sessionCookieOptions(secure, 60 * 60));
+        setAuthStateCookie(response, 60 * 60, secure);
 
         return response;
       }
@@ -94,14 +90,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    response.cookies.set("token", token, {
-      httpOnly: true,
-      path: "/",
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: SESSION_MAX_AGE,
-    });
-    setAuthStateCookie(response, SESSION_MAX_AGE);
+    response.cookies.set("token", token, sessionCookieOptions(secure, SESSION_MAX_AGE));
+    setAuthStateCookie(response, SESSION_MAX_AGE, secure);
 
     return response;
   } catch (err) {

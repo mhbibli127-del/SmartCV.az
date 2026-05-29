@@ -41,7 +41,9 @@ openssl rand -base64 32
 |----------|---------|
 | `MONGODB_URI` | Legacy `/api/cv/*` + analytics (core Studio uses Prisma only) |
 | `GOOGLE_CLIENT_ID/SECRET` | Google OAuth |
-| `NEXT_PUBLIC_POSTHOG_KEY` | Product analytics |
+| `NEXT_PUBLIC_POSTHOG_ENABLED` | Set `true` only with a valid `phc_` project key |
+| `NEXT_PUBLIC_POSTHOG_KEY` | PostHog Project API Key (`phc_…` from Project Settings) |
+| `NEXT_PUBLIC_POSTHOG_HOST` | `https://us.i.posthog.com` or `https://eu.i.posthog.com` |
 | `SENTRY_DSN` | Error monitoring |
 
 ## 5. Database setup

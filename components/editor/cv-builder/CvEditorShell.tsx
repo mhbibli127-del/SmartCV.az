@@ -15,6 +15,7 @@ interface CvEditorShellProps {
   onExport: () => void;
   saving: boolean;
   exporting: boolean;
+  exportDisabled?: boolean;
   canvasRef?: React.Ref<EditorCanvasHandle>;
 }
 
@@ -25,6 +26,7 @@ function CvEditorShellInner({
   onExport,
   saving,
   exporting,
+  exportDisabled,
   canvasRef,
 }: CvEditorShellProps) {
   const internalRef = useRef<EditorCanvasHandle>(null);
@@ -59,6 +61,7 @@ function CvEditorShellInner({
         onExport={onExport}
         saving={saving}
         exporting={exporting}
+        exportDisabled={exportDisabled}
       />
       <div className="min-h-0 flex-1">
         <EditorCanvas ref={ref} />

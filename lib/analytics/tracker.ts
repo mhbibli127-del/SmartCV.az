@@ -1,5 +1,9 @@
 import type { AnalyticsEventName } from "@/lib/analytics/types";
-import { getPostHogClientSync, initPostHogClient } from "@/lib/analytics/client";
+import {
+  identifyUser as identifyPostHogUser,
+  resetUser as resetPostHogUser,
+  trackEvent,
+} from "@/lib/analytics/posthog";
 import { sanitizeAnalyticsProperties } from "@/lib/utils/analytics/sanitize";
 import {
   isAnalyticsOptedOut,
@@ -42,16 +46,7 @@ function capturePostHog(
   properties: Record<string, unknown>
 ): void {
   if (!isPostHogConfigured() || isAnalyticsOptedOut()) return;
-
-  const client = getPostHogClientSync();
-  if (!client) {
-    void initPostHogClient().then((ph) => {
-      ph?.capture(event, sanitizeAnalyticsProperties(properties));
-    });
-    return;
-  }
-
-  client.capture(event, sanitizeAnalyticsProperties(properties));
+  trackEvent(event, sanitizeAnalyticsProperties(properties));
 }
 
 /**
@@ -96,15 +91,14 @@ export class AnalyticsTracker {
   setUserId(userId: string): void {
     this.userId = userId;
     if (isPostHogConfigured() && !isAnalyticsOptedOut()) {
-      void initPostHogClient().then((ph) => {
-        ph?.identify(userId, { $email: userId });
-      });
+      identifyPostHogUser(userId, { $email: userId });
     }
   }
 
   resetUser(): void {
     this.userId = null;
-    getPostHogClientSync()?.reset();
+    if (!isPostHogConfigured()) return;
+    resetPostHogUser();
   }
 
   private withUser(data: Record<string, unknown> = {}): Record<string, unknown> {

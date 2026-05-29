@@ -1,3 +1,5 @@
+"use client";
+
 // Global state management for CV Builder using React Context
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 

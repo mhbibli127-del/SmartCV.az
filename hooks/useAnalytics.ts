@@ -3,6 +3,10 @@
 import { useCallback, useMemo } from "react";
 import { AnalyticsTracker } from "@/lib/analytics/tracker";
 import {
+  trackButtonClicked as emitButtonClicked,
+  trackEvent as emitTrackEvent,
+} from "@/lib/analytics/posthog";
+import {
   trackAIUsage as emitAIUsage,
   trackOnboardingStep as emitOnboardingStep,
   trackPortfolioExported as emitPortfolioExported,
@@ -131,6 +135,17 @@ export function useAnalytics() {
     [tracker]
   );
 
+  const trackEvent = useCallback(
+    (name: string, properties?: Record<string, unknown>) =>
+      emitTrackEvent(name, properties),
+    []
+  );
+  const trackButtonClicked = useCallback(
+    (buttonName: string, properties?: Record<string, unknown>) =>
+      emitButtonClicked(buttonName, properties),
+    []
+  );
+
   return {
     trackPageView,
     trackButtonClick,
@@ -156,5 +171,7 @@ export function useAnalytics() {
     trackAIUsage,
     trackSubscriptionUpgrade,
     trackOnboardingStep,
+    trackEvent,
+    trackButtonClicked,
   };
 }

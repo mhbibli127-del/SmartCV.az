@@ -77,3 +77,9 @@ export const SAMPLE: ResumeSampleData = {
   skills: "Figma\nReact\nUI/UX\nBranding\nDesign Systems\nPrototyping\nUser Research",
   languages: "English — Native\nSpanish — Fluent\nFrench — Conversational",
 };
+
+/** Local bundled portrait — works offline and avoids external CORS failures. */
+export const DEFAULT_PORTRAIT_SRC = "/samples/default-portrait.svg";
+
+/** Default avatar for template image slots. */
+export const SAMPLE_PHOTO_URL = DEFAULT_PORTRAIT_SRC;

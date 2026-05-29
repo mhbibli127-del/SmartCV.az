@@ -1,4 +1,15 @@
-/** Backward-compatible analytics entry — existing imports use `@/lib/analytics`. */
+/**
+ * Primary analytics entry — PostHog helpers + backward-compatible exports.
+ */
+export {
+  trackEvent,
+  identifyUser,
+  resetUser,
+  trackButtonClicked,
+  initPostHog,
+  getPostHogInstance,
+} from "@/lib/analytics/posthog";
+
 export { useAnalytics } from "@/hooks/useAnalytics";
 export { AnalyticsTracker, captureAnalyticsEvent } from "@/lib/analytics/tracker";
 export { captureServerEvent, captureAIUsageServer } from "@/lib/analytics/server";
