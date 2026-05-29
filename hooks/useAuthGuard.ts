@@ -7,19 +7,26 @@ import { verifyDashboardSessionOnce } from "@/lib/auth-session-verify";
 
 /**
  * Validates the dashboard session once per tab.
- * - 401 → logout (recoverFromStaleSession)
+ * - 401 → full logout + hard redirect (no middleware loop)
  * - 403 → OTP redirect
- * - 5xx / network → degraded mode (no login ↔ dashboard redirect loop)
+ * - 5xx / network → degraded mode (stay on dashboard)
  */
 export function useAuthGuard() {
   const { status } = useSession();
   const router = useRouter();
-  const startedRef = useRef(false);
+  const routerRef = useRef(router);
+  routerRef.current = router;
+
+  const ranForStatusRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (status === "loading" || startedRef.current) return;
-    startedRef.current = true;
+    if (status === "loading") return;
+    if (ranForStatusRef.current === status) return;
+    ranForStatusRef.current = status;
 
-    void verifyDashboardSessionOnce({ sessionStatus: status, router });
-  }, [status, router]);
+    void verifyDashboardSessionOnce({
+      sessionStatus: status,
+      router: routerRef.current,
+    });
+  }, [status]);
 }

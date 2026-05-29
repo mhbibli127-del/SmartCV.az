@@ -1,9 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { hasAuthStateCookie, shouldFetchAuthenticatedApis } from "@/lib/auth-client";
+import {
+  hasAuthStateCookie,
+  recoverFromStaleSession,
+  shouldFetchAuthenticatedApis,
+} from "@/lib/auth-client";
 import { isTransientApiFailure, parseJsonSafe } from "@/lib/auth-api-client";
+import { isAuthVerificationSettled } from "@/lib/auth-verification-state";
 
 export interface CurrentUser {
   email: string;
@@ -20,6 +25,7 @@ interface UseCurrentUserResult {
 let cachedUser: CurrentUser | null = null;
 let inflight: Promise<CurrentUser | null> | null = null;
 let lastTransientFailureAt = 0;
+let unauthorizedHandled = false;
 const listeners = new Set<(u: CurrentUser | null) => void>();
 
 const TRANSIENT_COOLDOWN_MS = 60_000;
@@ -29,6 +35,10 @@ async function fetchCurrentUser(force = false): Promise<CurrentUser | null> {
     cachedUser = null;
     listeners.forEach((cb) => cb(null));
     return null;
+  }
+
+  if (unauthorizedHandled) {
+    return cachedUser;
   }
 
   if (
@@ -54,11 +64,17 @@ async function fetchCurrentUser(force = false): Promise<CurrentUser | null> {
         return cachedUser;
       }
 
-      if (!res.ok) {
-        if (res.status === 401) {
-          cachedUser = null;
-          listeners.forEach((cb) => cb(null));
+      if (res.status === 401) {
+        cachedUser = null;
+        listeners.forEach((cb) => cb(null));
+        if (!unauthorizedHandled) {
+          unauthorizedHandled = true;
+          void recoverFromStaleSession();
         }
+        return null;
+      }
+
+      if (!res.ok) {
         return cachedUser;
       }
 
@@ -73,6 +89,7 @@ async function fetchCurrentUser(force = false): Promise<CurrentUser | null> {
       };
       cachedUser = next;
       lastTransientFailureAt = 0;
+      unauthorizedHandled = false;
       listeners.forEach((cb) => cb(next));
       return next;
     } catch {
@@ -91,10 +108,13 @@ export function useCurrentUser(): UseCurrentUserResult {
   const [user, setUser] = useState<CurrentUser | null>(cachedUser);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const fetchedRef = useRef(false);
 
   const refresh = useCallback(async () => {
     cachedUser = null;
     lastTransientFailureAt = 0;
+    unauthorizedHandled = false;
+    fetchedRef.current = false;
     await fetchCurrentUser(true);
   }, []);
 
@@ -121,6 +141,7 @@ export function useCurrentUser(): UseCurrentUserResult {
       setUser(next);
       setLoading(false);
       setError(null);
+      fetchedRef.current = true;
       return () => {
         cancelled = true;
         listeners.delete(listener);
@@ -136,6 +157,16 @@ export function useCurrentUser(): UseCurrentUserResult {
         listeners.delete(listener);
       };
     }
+
+    if (fetchedRef.current && isAuthVerificationSettled()) {
+      setLoading(false);
+      return () => {
+        cancelled = true;
+        listeners.delete(listener);
+      };
+    }
+
+    fetchedRef.current = true;
 
     void fetchCurrentUser()
       .then((u) => {

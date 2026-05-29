@@ -77,8 +77,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
 
   useEffect(() => {
-
-    if (welcomeShown || !shouldFetchAuthenticatedApis(status)) return;
+    if (welcomeShown || status === "loading") return;
+    if (!shouldFetchAuthenticatedApis(status)) return;
 
     const showWelcome = async () => {
       try {
@@ -103,8 +103,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
 
     void showWelcome();
-
-  }, [welcomeShown, success, status]);
+    // Intentionally once per mount when auth is ready — not tied to toast fn identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [welcomeShown, status]);
 
 
 

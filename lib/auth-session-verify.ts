@@ -3,40 +3,23 @@
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import {
   hasAuthStateCookie,
-  recoverFromStaleSession,
   shouldFetchAuthenticatedApis,
 } from "@/lib/auth-client";
+import { forceLogoutToLogin } from "@/lib/auth-redirect";
 import { isTransientApiFailure, isUnauthorized, parseJsonSafe } from "@/lib/auth-api-client";
-
-const SESSION_VERIFIED_KEY = "smartcv_auth_verified";
-const SESSION_DEGRADED_KEY = "smartcv_auth_degraded";
+import {
+  isAuthVerificationSettled,
+  markAuthDegraded,
+  markAuthVerified,
+} from "@/lib/auth-verification-state";
 
 type SessionStatus = "loading" | "authenticated" | "unauthenticated";
 
 let verifyInflight: Promise<void> | null = null;
 
-function markVerified(): void {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(SESSION_VERIFIED_KEY, "1");
-  sessionStorage.removeItem(SESSION_DEGRADED_KEY);
-}
-
-function markDegraded(): void {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(SESSION_DEGRADED_KEY, "1");
-}
-
-function alreadyHandledThisTab(): boolean {
-  if (typeof window === "undefined") return false;
-  return (
-    sessionStorage.getItem(SESSION_VERIFIED_KEY) === "1" ||
-    sessionStorage.getItem(SESSION_DEGRADED_KEY) === "1"
-  );
-}
-
 /**
  * Runs once per tab session. On DB/API outage (5xx), stays on dashboard in degraded
- * mode instead of ping-ponging login ↔ dashboard (replaceState infinite loop).
+ * mode instead of ping-ponging login ↔ dashboard.
  */
 export function verifyDashboardSessionOnce(options: {
   sessionStatus: SessionStatus;
@@ -48,7 +31,7 @@ export function verifyDashboardSessionOnce(options: {
     return Promise.resolve();
   }
 
-  if (alreadyHandledThisTab()) {
+  if (isAuthVerificationSettled()) {
     return Promise.resolve();
   }
 
@@ -58,75 +41,74 @@ export function verifyDashboardSessionOnce(options: {
 
   verifyInflight = (async () => {
     try {
-      if (sessionStatus === "authenticated") {
-        if (!hasAuthStateCookie()) {
-          const bridge = await fetch("/api/auth/me", {
-            method: "POST",
-            credentials: "include",
-          });
+      if (sessionStatus === "authenticated" && !hasAuthStateCookie()) {
+        const bridge = await fetch("/api/auth/me", {
+          method: "POST",
+          credentials: "include",
+        });
 
-          if (bridge.ok) {
-            markVerified();
-            return;
-          }
-
-          if (isUnauthorized(bridge.status)) {
-            router.replace("/login");
-            return;
-          }
-
-          if (isTransientApiFailure(bridge.status)) {
-            markDegraded();
-            return;
-          }
-
-          router.replace("/login");
-        } else {
-          markVerified();
+        if (bridge.ok) {
+          markAuthVerified();
+          return;
         }
+
+        if (isUnauthorized(bridge.status)) {
+          await forceLogoutToLogin("session_expired");
+          return;
+        }
+
+        if (isTransientApiFailure(bridge.status)) {
+          markAuthDegraded();
+          return;
+        }
+
+        await forceLogoutToLogin("session_expired");
         return;
       }
 
       if (!shouldFetchAuthenticatedApis(sessionStatus)) {
-        router.replace("/login");
+        await forceLogoutToLogin("session_expired");
         return;
       }
 
       const res = await fetch("/api/auth/me", { credentials: "include" });
 
       if (res.ok) {
-        markVerified();
+        markAuthVerified();
         return;
       }
 
       if (isUnauthorized(res.status)) {
-        await recoverFromStaleSession();
+        await forceLogoutToLogin("session_expired");
         return;
       }
 
       if (res.status === 403) {
         const data = await parseJsonSafe<{ redirect?: string }>(res);
-        router.replace(data?.redirect ?? "/verify-otp");
+        const target = data?.redirect ?? "/verify-otp";
+        if (typeof window !== "undefined" && window.location.pathname !== target) {
+          router.replace(target);
+        }
         return;
       }
 
       if (isTransientApiFailure(res.status)) {
-        markDegraded();
+        markAuthDegraded();
         return;
       }
 
       if (!hasAuthStateCookie()) {
-        router.replace("/login?reason=session_expired");
+        await forceLogoutToLogin("session_expired");
         return;
       }
 
-      markDegraded();
+      markAuthDegraded();
     } catch {
       if (hasAuthStateCookie() || sessionStatus === "authenticated") {
-        markDegraded();
+        markAuthDegraded();
         return;
       }
-      router.replace("/login?reason=session_expired");
+      await forceLogoutToLogin("session_expired");
     }
   })().finally(() => {
     verifyInflight = null;

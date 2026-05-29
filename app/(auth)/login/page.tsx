@@ -13,6 +13,7 @@ import { InputFieldIcon } from "@/components/auth/AuthFormIcons";
 import { Icon } from "@/components/ui/icon";
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import OrDivider from "@/components/auth/OrDivider";
+import { clearAuthVerificationState } from "@/lib/auth-verification-state";
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthSignin: "Could not start Google sign-in. Check your OAuth configuration.",
@@ -97,6 +98,7 @@ function LoginForm() {
       }
 
       toast({ title: "Signed in", description: "Redirecting to your dashboard…" });
+      clearAuthVerificationState();
       const destination = result.redirect || callbackUrl || "/dashboard";
       window.location.assign(destination);
     } catch {

@@ -1,4 +1,5 @@
 import { clearAuthStateClient } from "@/lib/auth-client";
+import { clearAuthVerificationState } from "@/lib/auth-verification-state";
 
 const AUTH_STORAGE_KEYS = [
   "user_email",
@@ -11,8 +12,7 @@ export function clearAuthStorage() {
   for (const key of AUTH_STORAGE_KEYS) {
     localStorage.removeItem(key);
   }
-  // Defensive: ensure the client-side auth-state cookie is gone even if
-  // the server logout request fails (offline, network blip, etc.).
+  clearAuthVerificationState();
   clearAuthStateClient();
 }
 

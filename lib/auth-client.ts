@@ -10,6 +10,9 @@
  * authority on every protected request.
  */
 
+import { forceLogoutToLogin } from "@/lib/auth-redirect";
+import { markAuthMeFailed } from "@/lib/auth-verification-state";
+
 const AUTH_STATE_COOKIE = "auth_state";
 let recovering = false;
 
@@ -29,20 +32,18 @@ export function clearAuthStateClient(): void {
 export async function recoverFromStaleSession(): Promise<void> {
   if (typeof window === "undefined" || recovering) return;
   recovering = true;
-  clearAuthStateClient();
-  try {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-  } catch {
-    /* ignore */
-  }
-  window.location.href = "/login?reason=session_expired";
+  markAuthMeFailed();
+  await forceLogoutToLogin("session_expired");
 }
 
 /** True when we should attempt authenticated API calls from the client. */
 export function shouldFetchAuthenticatedApis(
   sessionStatus?: "loading" | "authenticated" | "unauthenticated"
 ): boolean {
-  if (sessionStatus === "authenticated") return true;
   if (sessionStatus === "loading") return false;
+  if (typeof window !== "undefined") {
+    if (sessionStorage.getItem("smartcv_auth_me_failed") === "1") return false;
+  }
+  if (sessionStatus === "authenticated") return true;
   return hasAuthStateCookie();
 }

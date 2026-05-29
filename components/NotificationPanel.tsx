@@ -4,9 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell, Check, AlertTriangle, Loader2 } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type { AppNotification } from "@/lib/notifications";
-import {
-  shouldFetchAuthenticatedApis,
-} from "@/lib/auth-client";
+import { shouldFetchAuthenticatedApis } from "@/lib/auth-client";
+import { isAuthVerificationSettled } from "@/lib/auth-verification-state";
 import { useSession } from "next-auth/react";
 
 type NotificationPanelProps = {
@@ -17,12 +16,17 @@ export default function NotificationPanel({
   onUnreadChange,
 }: NotificationPanelProps) {
   const { status } = useSession();
+  const onUnreadRef = useRef(onUnreadChange);
+  onUnreadRef.current = onUnreadChange;
+
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const initialLoadDoneRef = useRef(false);
+  const pollStartedRef = useRef(false);
 
   const loadNotifications = useCallback(async () => {
     if (!shouldFetchAuthenticatedApis(status)) {
@@ -32,6 +36,12 @@ export default function NotificationPanel({
       setLoading(false);
       return;
     }
+
+    if (status !== "authenticated" && !isAuthVerificationSettled()) {
+      return;
+    }
+
+    setLoading(true);
     try {
       const { ok, status: httpStatus, data } = await api.get<{
         notifications: AppNotification[];
@@ -41,7 +51,7 @@ export default function NotificationPanel({
       if (ok) {
         setNotifications(data.notifications || []);
         setUnreadCount(data.unreadCount || 0);
-        onUnreadChange?.(data.unreadCount || 0);
+        onUnreadRef.current?.(data.unreadCount || 0);
         setError(null);
       } else if (httpStatus === 401) {
         setNotifications([]);
@@ -55,17 +65,30 @@ export default function NotificationPanel({
     } finally {
       setLoading(false);
     }
-  }, [onUnreadChange, status]);
+  }, [status]);
 
   useEffect(() => {
-    loadNotifications();
+    if (status === "loading") return;
+    if (!shouldFetchAuthenticatedApis(status)) return;
+    if (status !== "authenticated" && !isAuthVerificationSettled()) return;
+    if (initialLoadDoneRef.current) return;
 
-    // Poll every 30s, but pause when the tab is hidden so we don't burn
-    // server requests / dev-mode DB connection attempts in the background.
+    initialLoadDoneRef.current = true;
+    void loadNotifications();
+  }, [status, loadNotifications]);
+
+  useEffect(() => {
+    if (status === "loading") return;
+    if (!shouldFetchAuthenticatedApis(status)) return;
+    if (status !== "authenticated" && !isAuthVerificationSettled()) return;
+    if (pollStartedRef.current) return;
+
+    pollStartedRef.current = true;
     let interval: ReturnType<typeof setInterval> | null = null;
+
     const start = () => {
       if (interval) return;
-      interval = setInterval(loadNotifications, 30_000);
+      interval = setInterval(() => void loadNotifications(), 30_000);
     };
     const stop = () => {
       if (!interval) return;
@@ -75,24 +98,21 @@ export default function NotificationPanel({
 
     const onVisibility = () => {
       if (document.visibilityState === "visible") {
-        loadNotifications();
+        void loadNotifications();
         start();
       } else {
         stop();
       }
     };
 
-    if (typeof document !== "undefined") {
-      if (document.visibilityState === "visible") start();
-      document.addEventListener("visibilitychange", onVisibility);
-    }
+    if (document.visibilityState === "visible") start();
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       stop();
-      if (typeof document !== "undefined") {
-        document.removeEventListener("visibilitychange", onVisibility);
-      }
+      document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [loadNotifications]);
+  }, [status, loadNotifications]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -108,12 +128,12 @@ export default function NotificationPanel({
     await api.patch("/api/notifications", { ids: undefined });
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnreadCount(0);
-    onUnreadChange?.(0);
+    onUnreadRef.current?.(0);
   };
 
   const handleToggle = () => {
     setOpen((prev) => !prev);
-    if (!open) loadNotifications();
+    if (!open) void loadNotifications();
   };
 
   return (
