@@ -1,7 +1,7 @@
 import type { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { isBuildPhase } from "@/lib/build";
-import { getNextAuthSecret, getNextAuthUrl } from "@/lib/env";
+import { ensureAuthUrlForDeployment, getNextAuthSecret, getNextAuthUrl } from "@/lib/env";
 import { ensureGoogleUser } from "@/lib/google-session-bridge";
 import {
   resolveOAuthDestination,
@@ -54,6 +54,7 @@ async function notifyGoogleLogin(email: string) {
  * NextAuth configuration — never cached (avoids empty providers after cold start).
  */
 export function getAuthOptions(): NextAuthOptions {
+  ensureAuthUrlForDeployment();
   const providers = buildProviders();
 
   if (process.env.NODE_ENV === "development" && providers.length === 0) {

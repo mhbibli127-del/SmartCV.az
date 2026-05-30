@@ -6,6 +6,7 @@ import { AppProviders } from "@/app/providers";
 import { inter, studioFontVariables } from "@/lib/fonts";
 import { rootMetadata } from "@/lib/seo/metadata";
 
+/** Root SEO + Google Search Console (meta tag + /public/google750ae19981486b4c.html). */
 export const metadata: Metadata = rootMetadata;
 
 export default function RootLayout({ children }: { children: ReactNode }) {

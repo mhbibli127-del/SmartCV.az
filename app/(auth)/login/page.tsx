@@ -18,7 +18,7 @@ import { resolveOAuthDestination } from "@/lib/auth-redirect-path";
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   google:
-    "Google sign-in could not start. Check GOOGLE_CLIENT_ID/SECRET and redirect URI in Google Console.",
+    "Google redirect URI mismatch. In Google Console add the exact callback from /api/auth/config, and set Vercel NEXTAUTH_URL to your live https:// domain (not localhost).",
   OAuthSignin: "Could not start Google sign-in. Check your OAuth configuration.",
   OAuthCallback: "Google sign-in was interrupted. Please try again.",
   OAuthCreateAccount: "Could not create your account via Google.",

@@ -344,6 +344,25 @@ export function getNextAuthUrl(): string {
   return fallback;
 }
 
+/**
+ * NextAuth reads `process.env.NEXTAUTH_URL` directly for Google `redirect_uri`.
+ * `/api/auth/config` used `getNextAuthUrl()` — if Vercel still had localhost in env,
+ * config looked correct while OAuth sent `http://localhost:3000/...` → redirect_uri_mismatch.
+ */
+export function ensureAuthUrlForDeployment(): string {
+  const resolved = getNextAuthUrl();
+  if (process.env.NODE_ENV !== "development") {
+    process.env.NEXTAUTH_URL = resolved;
+    if (
+      !process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+      isLocalhostUrl(process.env.NEXT_PUBLIC_APP_URL)
+    ) {
+      process.env.NEXT_PUBLIC_APP_URL = resolved;
+    }
+  }
+  return resolved;
+}
+
 export interface EnvReport {
   ok: boolean;
   missing: string[];
