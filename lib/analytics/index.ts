@@ -25,23 +25,17 @@ export {
   trackPageView,
 } from "@/lib/analytics/events";
 
-export { captureAnalyticsEvent, AnalyticsTracker } from "@/lib/analytics/tracker";
-export { captureServerEvent, captureAIUsageServer } from "@/lib/analytics/server";
 export {
+  captureAnalyticsEvent,
+  AnalyticsTracker,
   trackEvent,
-  identifyUser,
-  resetUser,
   trackButtonClicked,
-  initPostHog,
-  getPostHogInstance,
-} from "@/lib/analytics/posthog";
-export { initPostHogClient, getPostHogClientSync } from "@/lib/analytics/client";
+} from "@/lib/analytics/tracker";
+export { captureServerEvent, captureAIUsageServer } from "@/lib/analytics/server";
 
 export {
-  isPostHogConfigured,
   isAnalyticsOptedOut,
   setAnalyticsOptOut,
-  getPostHogHost,
 } from "@/lib/utils/analytics/env";
 
 export { sanitizeAnalyticsProperties } from "@/lib/utils/analytics/sanitize";

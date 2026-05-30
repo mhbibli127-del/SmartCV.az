@@ -1,6 +1,11 @@
 import mongoose from "mongoose";
 import type { Db } from "mongodb";
-import { maskMongoUri, requireMongoUri, isMongoConfigured } from "@/lib/env";
+import {
+  maskMongoUri,
+  requireMongoUri,
+  isMongoConfigured,
+  isMongoEnabled,
+} from "@/lib/env";
 import { isMongoCircuitOpen, openMongoCircuit, recordMongoFailure } from "@/lib/db-circuit";
 
 /**
@@ -75,6 +80,9 @@ function logFailureOnce(message: string, meta?: Record<string, unknown>): void {
 }
 
 async function createConnection(): Promise<typeof mongoose> {
+  if (!isMongoEnabled()) {
+    throw new Error("[mongodb] Disabled via MONGODB_ENABLED=false");
+  }
   if (!isMongoConfigured()) {
     throw new Error("[mongodb] MONGODB_URI is not configured");
   }

@@ -273,6 +273,117 @@ function CanvaCreativePreview({ template }: PreviewProps) {
   );
 }
 
+function SunsetGradientPreview({ template }: PreviewProps) {
+  const { colors } = template;
+  return (
+    <div className="relative h-full overflow-hidden" style={{ background: colors.background }}>
+      <div
+        className="h-[32%]"
+        style={{
+          background: `linear-gradient(135deg, ${colors.primary}, ${colors.accent}, #845ef7)`,
+        }}
+      />
+      <div className="absolute left-0 right-0 top-[26%] h-[6%] rounded-t-[50%] bg-white" />
+      <div
+        className="absolute left-[8%] top-[22%] h-[14%] w-[14%] rounded-full border-4 border-white shadow-lg"
+        style={{ background: colors.accent, opacity: 0.4 }}
+      />
+      <div className="absolute left-[28%] top-[20%] text-[8px] font-bold text-white">Your Name</div>
+      <div
+        className="absolute bottom-[6%] left-[6%] right-[6%] top-[34%] rounded-2xl bg-white shadow-md"
+        style={{ boxShadow: `0 8px 24px ${colors.primary}25` }}
+      >
+        <div
+          className="absolute left-[4%] top-[6%] h-[80%] w-[26%] rounded-xl"
+          style={{ background: `${colors.primary}14` }}
+        />
+        <div className="absolute left-[36%] top-[8%] text-[6px] font-bold" style={{ color: colors.text }}>
+          About
+        </div>
+        <div className="absolute left-[36%] top-[18%] h-[2px] w-[12%] rounded-full" style={{ background: colors.primary }} />
+        <div className="absolute left-[36%] top-[24%] space-y-1">
+          {[90, 75, 85].map((w) => (
+            <div key={w} className="h-[2px] rounded-full bg-zinc-200" style={{ width: `${w * 0.35}%` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SwissInternationalPreview({ template }: PreviewProps) {
+  const { colors } = template;
+  return (
+    <div className="relative flex h-full">
+      <div className="w-[5%]" style={{ background: colors.primary }} />
+      <div className="relative flex-1 p-[8%]">
+        <div
+          className="absolute right-[8%] top-[6%] h-[12%] w-[12%]"
+          style={{ background: colors.accent }}
+        />
+        <div className="text-[10px] font-black leading-none" style={{ color: colors.text }}>
+          NAME
+        </div>
+        <div className="mt-1 w-[40%] px-1 py-0.5 text-[4px] font-bold text-white" style={{ background: colors.text }}>
+          TITLE
+        </div>
+        <div className="my-2 h-[2px] w-full" style={{ background: colors.text }} />
+        <div className="text-[14px] font-black leading-none" style={{ color: colors.primary }}>
+          01
+        </div>
+        <div className="text-[5px] font-bold tracking-widest" style={{ color: colors.text }}>
+          PROFILE
+        </div>
+        <div className="mt-2 h-[2px] w-full bg-zinc-200" />
+        <div className="mt-2 text-[14px] font-black" style={{ color: colors.primary }}>
+          02
+        </div>
+        <div
+          className="absolute bottom-0 left-0 right-0 h-[18%] p-[6%]"
+          style={{ background: colors.surface ?? "#f5f5f4" }}
+        >
+          <div className="absolute bottom-[20%] right-[8%] h-[40%] w-[35%]" style={{ background: colors.accent }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ArtDecoLuxePreview({ template }: PreviewProps) {
+  const { colors } = template;
+  const gold = colors.accent;
+  return (
+    <div
+      className="relative h-full p-[7%]"
+      style={{ background: colors.background, color: colors.text }}
+    >
+      <div className="absolute inset-[5%] border-2" style={{ borderColor: gold }} />
+      <div className="absolute inset-[7%] border opacity-50" style={{ borderColor: gold }} />
+      <div className="absolute left-[12%] top-[14%] h-[18%] w-[14%] rounded-br-full opacity-20" style={{ background: gold }} />
+      <div className="absolute right-[12%] top-[14%] h-[18%] w-[14%] rounded-bl-full opacity-20" style={{ background: gold }} />
+      <div className="mx-auto mt-[12%] w-[30%] border-t-2" style={{ borderColor: gold }} />
+      <div className="mt-2 text-center text-[9px] tracking-[0.2em]" style={{ color: gold }}>
+        YOUR NAME
+      </div>
+      <div className="mt-1 text-center text-[4px] tracking-[0.3em] opacity-70">EXECUTIVE TITLE</div>
+      <div
+        className="mx-auto mt-3 h-[12%] w-[12%] rounded-full border-2"
+        style={{ borderColor: gold, background: `${gold}30` }}
+      />
+      <div
+        className="mx-auto mt-3 w-[85%] border p-2 text-center text-[4px] italic opacity-80"
+        style={{ borderColor: `${gold}50`, background: `${gold}10` }}
+      >
+        Luxury summary
+      </div>
+      <div className="absolute bottom-[10%] left-[15%] right-[15%] flex gap-2">
+        <div className="h-[2px] flex-1" style={{ background: gold }} />
+        <div className="h-[2px] flex-1" style={{ background: gold }} />
+      </div>
+    </div>
+  );
+}
+
 function ATSPreview() {
   return (
     <div className="h-full bg-white p-[10%] font-sans">
@@ -302,6 +413,9 @@ const PREVIEW_MAP: Record<TemplateSlug, React.ComponentType<PreviewProps>> = {
   "magazine-editorial": MagazinePreview,
   "canva-creative": CanvaCreativePreview,
   "ats-ultra-professional": ATSPreview,
+  "sunset-gradient": SunsetGradientPreview,
+  "swiss-international": SwissInternationalPreview,
+  "art-deco-luxe": ArtDecoLuxePreview,
 };
 
 function TemplatePreviewRendererInner({ template, className = "" }: PreviewProps) {

@@ -1,10 +1,9 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Toolbar } from "@/components/editor/Toolbar";
 import { CanvaSidebar } from "@/components/editor/CanvaSidebar";
 import { getCanvasStateFromStore, useEditorStore } from "@/lib/editor-store";
@@ -13,7 +12,6 @@ import { PageShell, PageHeader } from "@/components/ui/page-shell";
 import { Button } from "@/components/ui/button";
 import { createDefaultCanvas } from "@/lib/layout-engine";
 import { hydrateCvData, sectionsToCanvasElements, canvasToSections } from "@/lib/cv-hydration";
-import { AICopilot } from "@/components/design/AICopilot";
 import { getTemplateBySlug } from "@/lib/design-engine/template-catalog";
 import { useDesignStore } from "@/lib/design-store";
 import { designSnapshot, restoreDesignFromContent } from "@/lib/design-persistence";
@@ -26,6 +24,7 @@ import { EditorRulers } from "@/components/editor/EditorRulers";
 import { LiveblocksRoom } from "@/components/realtime/LiveblocksRoom";
 import { SkeletonEditor } from "@/components/ui/skeleton";
 import type { CanvasEditorHandle } from "@/components/editor/CanvasEditor";
+import { CanvasEditorLazy } from "@/components/editor/CanvasEditorLazy";
 import { waitForCanvasReady } from "@/lib/canvas-ready";
 import { useCanvasReady } from "@/hooks/useCanvasReady";
 import {
@@ -35,19 +34,6 @@ import {
   exportKonvaDataUrl,
   exportKonvaPdf,
 } from "@/lib/studio-export";
-
-const CanvasEditor = dynamic(
-  () => import("@/components/editor/CanvasEditor").then((m) => m.CanvasEditor),
-  { ssr: false, loading: () => <EditorLoading /> }
-);
-
-function EditorLoading() {
-  return (
-    <div className="flex flex-1 items-center justify-center rounded-[14px] border border-black/[0.08] bg-zinc-50 py-32">
-      <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
-    </div>
-  );
-}
 
 function VisualEditorContent() {
   const router = useRouter();
@@ -61,7 +47,8 @@ function VisualEditorContent() {
   const selectElement = useEditorStore((s) => s.selectElement);
   const setExporting = useEditorStore((s) => s.setExporting);
   const setEditingId = useEditorStore((s) => s.setEditingId);
-  const setTemplate = useDesignStore((s) => s.setTemplate);
+  const setTemplateMeta = useDesignStore((s) => s.setTemplateMeta);
+  const applyThemeToCanvas = useDesignStore((s) => s.applyThemeToCanvas);
   const hydrateDesign = useDesignStore((s) => s.hydrateDesign);
   const activeTheme = useDesignStore((s) => s.activeTheme);
   const selectedTemplate = useDesignStore((s) => s.selectedTemplate);
@@ -133,6 +120,7 @@ function VisualEditorContent() {
         }
         const restored = restoreDesignFromContent(content);
         if (restored) hydrateDesign(restored);
+        applyThemeToCanvas();
         setTitle(data.cv?.title ?? "Untitled CV");
       } catch {
         toastError("Load failed", "Could not load this CV.");
@@ -142,13 +130,16 @@ function VisualEditorContent() {
       }
     };
     load();
-  }, [cvId, loadElements, toastError, hydrateDesign]);
+  }, [cvId, loadElements, toastError, hydrateDesign, applyThemeToCanvas]);
 
   useEffect(() => {
     if (!templateSlug || loading) return;
     const template = getTemplateBySlug(templateSlug);
-    if (template) setTemplate(template);
-  }, [templateSlug, loading, setTemplate]);
+    if (template) {
+      setTemplateMeta(template);
+      applyThemeToCanvas();
+    }
+  }, [templateSlug, loading, setTemplateMeta, applyThemeToCanvas]);
 
   useEffect(() => {
     refreshLiveScores();
@@ -292,11 +283,13 @@ function VisualEditorContent() {
         <div className="relative flex min-w-0 flex-1 flex-col gap-4">
           <EditorRulers width={794} height={1123} />
           <FloatingToolbar />
-          <CanvasEditor ref={canvasRef} />
+          <CanvasEditorLazy
+            ref={canvasRef}
+            loadingClassName="flex flex-1 items-center justify-center rounded-[14px] border border-black/[0.08] bg-zinc-50 py-32"
+          />
         </div>
       </div>
 
-      <AICopilot />
     </PageShell>
     </LiveblocksRoom>
   );
@@ -304,7 +297,7 @@ function VisualEditorContent() {
 
 export default function VisualEditorPage() {
   return (
-    <Suspense fallback={<EditorLoading />}>
+    <Suspense fallback={<SkeletonEditor />}>
       <VisualEditorContent />
     </Suspense>
   );

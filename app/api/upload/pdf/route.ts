@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthenticatedUser } from "@/lib/session";
-import { getOpenAI } from "@/lib/openai";
 import { extractTextFromPdf, sanitizePdfText } from "@/lib/pdf-parser";
-import { assertCanUseAI, incrementAiUsed } from "@/lib/ai-limit";
 import { PDF_FORM_FIELD_NAMES } from "@/lib/pdf/constants";
 import { validatePdfBuffer } from "@/lib/pdf/validation";
 import { handleApiError, unauthorized } from "@/lib/api-errors";
@@ -45,14 +43,6 @@ export async function POST(req: NextRequest) {
     const user = await getAuthenticatedUser(req);
     if (!user?.email) {
       return unauthorized();
-    }
-
-    const aiCheck = await assertCanUseAI(user.email);
-    if (!aiCheck.allowed) {
-      return NextResponse.json(
-        { ...EMPTY_CV, error: aiCheck.error, code: aiCheck.code },
-        { status: 403 }
-      );
     }
 
     const formData = await req.formData();
@@ -98,46 +88,19 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const openai = getOpenAI();
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You extract structured CV/resume data. Return valid JSON only. Be precise; infer missing fields conservatively.",
-        },
-        {
-          role: "user",
-          content: `Extract CV data from this resume text:\n\n${rawText}\n\nReturn JSON:
-{
-  "fullName", "email", "phone", "location", "website", "title", "targetIndustry",
-  "summary", "rawExperience", "rawEducation", "rawSkills",
-  "experience": [{ "title", "company", "startDate", "endDate", "description": [] }],
-  "education": [{ "degree", "university", "graduationYear" }],
-  "skills": [], "achievements": []
-}`,
-        },
-      ],
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-    });
-
-    const parsed = JSON.parse(completion.choices[0]?.message?.content ?? "{}");
-    await incrementAiUsed(user.email).catch(() => {});
-
     return NextResponse.json({
       ...EMPTY_CV,
-      ...parsed,
+      rawExperience: rawText.slice(0, 12000),
+      summary: rawText.slice(0, 500),
       source: "pdf_upload",
       success: true,
+      message:
+        "PDF mətni çıxarıldı. Bölmələri Studio-da əl ilə düzənləyin.",
+      code: "TEXT_ONLY",
     });
   } catch (err) {
     console.error("[upload/pdf]", err);
-    const message =
-      err instanceof Error && err.message.includes("OPENAI_API_KEY")
-        ? "AI parsing is not configured. Set OPENAI_API_KEY to import PDFs."
-        : "PDF processing hit a snag — you can still build your CV manually.";
+    const message = "PDF emalında xəta — CV-ni əl ilə yarada bilərsiniz.";
 
     return NextResponse.json(
       {

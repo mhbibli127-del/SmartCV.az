@@ -1,7 +1,6 @@
 "use client";
 
 import { memo, useCallback, useState } from "react";
-import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Briefcase,
@@ -10,7 +9,7 @@ import {
   Languages,
   LayoutTemplate,
   Palette,
-  Sparkles,
+  Paintbrush,
   Type,
   Wrench,
   FolderKanban,
@@ -20,12 +19,8 @@ import type { LeftSidebarSection } from "@/types/cv-editor";
 import { useCvEditorStore } from "@/store/cv-editor-store";
 import { ImageUploadPanel } from "@/components/editor/cv-builder/ImageUploadPanel";
 import { TemplateSwitcher } from "@/components/editor/cv-builder/TemplateSwitcher";
+import { CvEditorBackgroundPanel } from "@/components/editor/cv-builder/CvEditorBackgroundPanel";
 import { cn } from "@/lib/utils";
-
-const AIToolsPanel = dynamic(
-  () => import("@/components/editor/cv-builder/AIToolsPanel").then((m) => m.AIToolsPanel),
-  { ssr: false }
-);
 
 const SECTIONS: Array<{
   id: LeftSidebarSection;
@@ -43,7 +38,7 @@ const SECTIONS: Array<{
   { id: "colors", label: "Colors", icon: Palette },
   { id: "fonts", label: "Fonts", icon: Type },
   { id: "layout", label: "Layout", icon: LayoutTemplate },
-  { id: "ai", label: "AI Tools", icon: Sparkles },
+  { id: "background", label: "Background", icon: Paintbrush },
 ];
 
 function LeftSidebarInner() {
@@ -136,10 +131,10 @@ function LeftSidebarInner() {
                     className="overflow-hidden"
                   >
                     <div className="px-3 pb-2 pt-1">
-                      {id === "ai" ? (
-                        <AIToolsPanel />
-                      ) : id === "templates" ? (
+                      {id === "templates" ? (
                         <TemplateSwitcher />
+                      ) : id === "background" ? (
+                        <CvEditorBackgroundPanel />
                       ) : id === "colors" || id === "fonts" || id === "layout" ? (
                         <button
                           type="button"

@@ -3,7 +3,7 @@
  */
 import prisma from "@/lib/prisma";
 import { findSaasUserByEmail } from "@/lib/saas-user";
-import { getCvLimitForPlan, getAiLimitForPlan, type UserPlan } from "@/lib/user-plans";
+import { getCvLimitForPlan, type UserPlan } from "@/lib/user-plans";
 import { countUserCVs } from "@/lib/plan-limits";
 
 export type VerificationStatus = "none" | "pending" | "verified" | "rejected";
@@ -18,7 +18,7 @@ export interface UserPlanRecord {
   studentId: string | null;
   verificationStatus: VerificationStatus;
   studentEmailDomain: string | null;
-  features: { maxAI: number };
+  features: { maxExports: number };
   effectivePlan: UserPlan;
 }
 
@@ -48,7 +48,7 @@ export async function getUserPlanRecord(email: string): Promise<UserPlanRecord |
       ? prismaUser.verificationStatus
       : "none",
     studentEmailDomain: prismaUser?.studentEmailDomain ?? null,
-    features: { maxAI: getAiLimitForPlan(plan) },
+    features: { maxExports: 999 },
     effectivePlan: plan,
   };
 }

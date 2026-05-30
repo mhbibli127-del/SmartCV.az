@@ -1,5 +1,6 @@
 import type { CvEditorElement } from "@/types/cv-editor";
 import { DEFAULT_PORTRAIT_SRC } from "@/templates/shared";
+import { isTemplateBaseImage } from "@/lib/cv-editor/template-base-layer";
 
 export { DEFAULT_PORTRAIT_SRC };
 
@@ -13,6 +14,7 @@ export function resolveImageSrc(src?: string | null): string {
 export function injectDefaultImageSources(elements: CvEditorElement[]): CvEditorElement[] {
   return elements.map((element) => {
     if (element.type !== "image") return element;
+    if (isTemplateBaseImage(element.id)) return element;
     return { ...element, src: resolveImageSrc(element.src) };
   });
 }

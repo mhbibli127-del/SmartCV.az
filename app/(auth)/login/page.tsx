@@ -14,8 +14,11 @@ import { Icon } from "@/components/ui/icon";
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import OrDivider from "@/components/auth/OrDivider";
 import { clearAuthVerificationState } from "@/lib/auth-verification-state";
+import { resolveOAuthDestination } from "@/lib/auth-redirect-path";
 
 const OAUTH_ERROR_MESSAGES: Record<string, string> = {
+  google:
+    "Google sign-in could not start. Check GOOGLE_CLIENT_ID/SECRET and redirect URI in Google Console.",
   OAuthSignin: "Could not start Google sign-in. Check your OAuth configuration.",
   OAuthCallback: "Google sign-in was interrupted. Please try again.",
   OAuthCreateAccount: "Could not create your account via Google.",
@@ -36,6 +39,14 @@ function LoginForm() {
   const { toast } = useToast();
 
   useEffect(() => {
+    const rawCb = searchParams.get("callbackUrl");
+    const oauthError = searchParams.get("error");
+    if (rawCb?.includes("sync-session") || (rawCb && rawCb.length > 80)) {
+      const q = oauthError ? `?error=${encodeURIComponent(oauthError)}` : "";
+      router.replace(`/login${q}`);
+      return;
+    }
+
     const reason = searchParams.get("reason");
     if (reason === "session_expired") {
       toast({
@@ -44,7 +55,6 @@ function LoginForm() {
       });
     }
 
-    const oauthError = searchParams.get("error");
     if (oauthError) {
       const message =
         OAUTH_ERROR_MESSAGES[oauthError] ?? OAUTH_ERROR_MESSAGES.Default;
@@ -54,10 +64,14 @@ function LoginForm() {
         description: message,
         variant: "error",
       });
+      if (oauthError === "OAuthCallback") {
+        void fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      }
+      const rawCb = searchParams.get("callbackUrl");
     }
-  }, [searchParams, toast]);
+  }, [searchParams, toast, router]);
 
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const callbackUrl = resolveOAuthDestination(searchParams.get("callbackUrl"));
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -119,16 +133,17 @@ function LoginForm() {
           className="space-y-8"
         >
           <h1 className="text-5xl md:text-6xl font-semibold leading-tight tracking-tight">
-            SmartCV ilə <br />
-            <span className="text-gray-400">CV-ni analiz et</span> <br />
-            və iş tap.
+            Peşəkar CV-ni <br />
+            <span className="text-gray-400">dəqiq dizayn et,</span> <br />
+            daha tez müsahibəyə çat.
           </h1>
 
           <p className="text-lg text-gray-600 max-w-md">
-            AI texnologiyası ilə CV-ni yoxla, səhvləri düzəlt və daha çox interview qazan.
+            Şablonlar, Studio redaktoru və PDF ixracı ilə CV-nizi işə uyğun, oxunaqlı və
+            inamla təqdim edə biləcəyiniz formata gətirin.
           </p>
 
-          <AuthFeatureList items={["AI analiz", "ATS uyğunluq", "Real nəticə"]} />
+          <AuthFeatureList items={["Peşəkar şablonlar", "ATS uyğun layout", "PDF ixrac"]} />
         </motion.div>
 
         <motion.div

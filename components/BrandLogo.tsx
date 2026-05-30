@@ -47,7 +47,7 @@ export default function BrandLogo({
           </span>
           {showTagline && (
             <p className="text-xs font-medium text-gray-500">
-              AI-Powered Resume Builder
+              Professional CV Builder
             </p>
           )}
         </div>

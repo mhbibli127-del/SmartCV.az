@@ -67,7 +67,12 @@ export function verifyDashboardSessionOnce(options: {
       }
 
       if (!shouldFetchAuthenticatedApis(sessionStatus)) {
-        await forceLogoutToLogin("session_expired");
+        if (
+          typeof window !== "undefined" &&
+          !window.location.pathname.startsWith("/login")
+        ) {
+          router.replace("/login");
+        }
         return;
       }
 

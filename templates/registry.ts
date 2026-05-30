@@ -12,6 +12,9 @@ import { buildGlassmorphism } from "@/templates/Glassmorphism/build";
 import { buildMagazineEditorial } from "@/templates/MagazineEditorial/build";
 import { buildCanvaCreative } from "@/templates/CanvaCreative/build";
 import { buildATSUltraProfessional } from "@/templates/ATSUltraProfessional/build";
+import { buildSunsetGradient } from "@/templates/SunsetGradient/build";
+import { buildSwissInternational } from "@/templates/SwissInternational/build";
+import { buildArtDecoLuxe } from "@/templates/ArtDecoLuxe/build";
 
 export type TemplateSlug =
   | "minimal-corporate"
@@ -25,7 +28,10 @@ export type TemplateSlug =
   | "glassmorphism"
   | "magazine-editorial"
   | "canva-creative"
-  | "ats-ultra-professional";
+  | "ats-ultra-professional"
+  | "sunset-gradient"
+  | "swiss-international"
+  | "art-deco-luxe";
 
 export type TemplateBuilder = (
   theme: TemplateTheme,
@@ -51,10 +57,15 @@ export const TEMPLATE_BUILDERS: Record<TemplateSlug, TemplateBuilder> = {
   "magazine-editorial": buildMagazineEditorial,
   "canva-creative": buildCanvaCreative,
   "ats-ultra-professional": buildATSUltraProfessional,
+  "sunset-gradient": buildSunsetGradient,
+  "swiss-international": buildSwissInternational,
+  "art-deco-luxe": buildArtDecoLuxe,
 };
 
 const BACKGROUNDS: Partial<Record<TemplateSlug, (t: TemplateTheme) => string>> = {
   "executive-dark": (t) => t.background,
+  "sunset-gradient": (t) => t.surface ?? "#fff5f5",
+  "art-deco-luxe": (t) => t.background,
   "neon-cyber": (t) =>
     t.background ||
     "linear-gradient(160deg, #0f0f23 0%, #1a0a2e 40%, #0d1b2a 100%)",

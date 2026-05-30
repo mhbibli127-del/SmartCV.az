@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { signIn } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 import GoogleLogo from "@/components/auth/GoogleLogo";
@@ -12,6 +11,10 @@ type GoogleSignInButtonProps = {
   className?: string;
 };
 
+/**
+ * NextAuth OAuth requires POST /api/auth/signin/google with a CSRF token.
+ * GET redirects fail with error=google (never reaches Google account picker).
+ */
 export default function GoogleSignInButton({
   callbackUrl = "/dashboard",
   className = "",
@@ -49,22 +52,36 @@ export default function GoogleSignInButton({
     }
 
     setLoading(true);
+
     try {
-      const result = await signIn("google", { callbackUrl, redirect: false });
-      if (result?.error) {
-        toast({
-          title: "Google sign-in failed",
-          description: "Could not start Google authentication. Please try again.",
-          variant: "error",
-        });
-        setLoading(false);
-        return;
+      const csrfRes = await fetch("/api/auth/csrf", { credentials: "include" });
+      if (!csrfRes.ok) {
+        throw new Error("CSRF fetch failed");
       }
-      if (result?.url) {
-        window.location.href = result.url;
-        return;
+      const { csrfToken } = (await csrfRes.json()) as { csrfToken?: string };
+      if (!csrfToken) {
+        throw new Error("Missing CSRF token");
       }
-      window.location.href = callbackUrl;
+
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = "/api/auth/signin/google";
+      form.style.display = "none";
+
+      const csrfInput = document.createElement("input");
+      csrfInput.type = "hidden";
+      csrfInput.name = "csrfToken";
+      csrfInput.value = csrfToken;
+      form.appendChild(csrfInput);
+
+      const cbInput = document.createElement("input");
+      cbInput.type = "hidden";
+      cbInput.name = "callbackUrl";
+      cbInput.value = callbackUrl.startsWith("/") ? callbackUrl : "/dashboard";
+      form.appendChild(cbInput);
+
+      document.body.appendChild(form);
+      form.submit();
     } catch {
       setLoading(false);
       toast({
@@ -96,7 +113,7 @@ export default function GoogleSignInButton({
   return (
     <motion.button
       type="button"
-      onClick={handleClick}
+      onClick={() => void handleClick()}
       disabled={loading}
       whileHover={{ scale: loading ? 1 : 1.01 }}
       whileTap={{ scale: loading ? 1 : 0.98 }}

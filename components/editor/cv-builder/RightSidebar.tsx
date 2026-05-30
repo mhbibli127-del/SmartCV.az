@@ -3,6 +3,7 @@
 import { memo, useMemo } from "react";
 import type { CvEditorElement } from "@/types/cv-editor";
 import { useCvEditorStore } from "@/store/cv-editor-store";
+import { toHexColorForInput } from "@/lib/color-utils";
 
 const FONT_FAMILIES = ["Inter", "Georgia", "Arial", "Helvetica", "Times New Roman"];
 
@@ -165,7 +166,7 @@ function RightSidebarInner() {
         <Field label="Color">
           <input
             type="color"
-            value={s.color ?? "#18181b"}
+            value={toHexColorForInput(s.color)}
             onChange={(e) => patchStyle({ color: e.target.value })}
             className="h-9 w-full cursor-pointer rounded-lg border border-zinc-200"
           />
@@ -174,7 +175,7 @@ function RightSidebarInner() {
         <Field label="Background">
           <input
             type="color"
-            value={s.background?.startsWith("#") ? s.background : "#ffffff"}
+            value={toHexColorForInput(s.background, "#ffffff")}
             onChange={(e) => patchStyle({ background: e.target.value })}
             className="h-9 w-full cursor-pointer rounded-lg border border-zinc-200"
           />

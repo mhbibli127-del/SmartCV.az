@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { AnalyticsTracker } from "@/lib/analytics/tracker";
 import {
+  AnalyticsTracker,
   trackButtonClicked as emitButtonClicked,
   trackEvent as emitTrackEvent,
-} from "@/lib/analytics/posthog";
+} from "@/lib/analytics/tracker";
 import {
   trackAIUsage as emitAIUsage,
   trackOnboardingStep as emitOnboardingStep,
@@ -28,7 +28,7 @@ import type {
 
 /**
  * Primary React hook for product analytics.
- * Backward-compatible with legacy tracker methods + new typed helpers.
+ * Backward-compatible with legacy tracker methods + typed helpers.
  */
 export function useAnalytics() {
   const tracker = useMemo(() => AnalyticsTracker.getInstance(), []);

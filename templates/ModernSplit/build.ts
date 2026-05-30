@@ -68,7 +68,7 @@ export function buildModernSplit(theme: TemplateTheme, fonts: TemplateFonts) {
       y: 280,
       width: sidebarW - 48,
       height: 80,
-      content: "leyla@email.com\n+994 50 123 45 67\nBaku, Azerbaijan",
+      content: SAMPLE.contact.replace(/\s•\s/g, "\n"),
       style: {
         fontSize: 10,
         color: "rgba(255,255,255,0.85)",

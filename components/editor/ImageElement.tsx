@@ -2,16 +2,15 @@
 
 import { memo, useCallback, useEffect, useState } from "react";
 import { Group, Rect, Image as KonvaImage, Text } from "react-konva";
-import type { KonvaEventObject } from "konva/lib/Node";
 import type { EditorElement } from "@/types/cv-document";
-import { useEditorStore } from "@/lib/editor-store";
-import { clampElement, computeAlignmentSnap } from "@/lib/layout-engine";
+import { useCanvasElementDrag } from "@/lib/canvas-drag";
 import {
   getImageCrop,
   imageCornerRadius,
+  loadCanvasImage,
 } from "@/components/editor/image-utils";
-import { preloadImage } from "@/lib/wait-for-images";
 import { resolveImageSrc } from "@/lib/cv-editor/template-images";
+import { isTemplateBaseImage } from "@/lib/cv-editor/template-base-layer";
 
 type Props = {
   element: EditorElement;
@@ -22,79 +21,69 @@ type Props = {
 
 function ImageElementInner({ element, isSelected, onSelect, disableDrag }: Props) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
-  const elements = useEditorStore((s) => s.elements);
-  const snapEnabled = useEditorStore((s) => s.snapEnabled);
-  const setAlignmentGuides = useEditorStore((s) => s.setAlignmentGuides);
-  const commitElementMove = useEditorStore((s) => s.commitElementMove);
-  const clearAlignmentGuides = useEditorStore((s) => s.clearAlignmentGuides);
+
+  const onSelectOnDragStart = useCallback((id: string) => onSelect(id), [onSelect]);
+  const {
+    nodeRef,
+    dragBoundFunc,
+    handleDragStart,
+    handleDragMove,
+    handleDragEnd,
+  } = useCanvasElementDrag(element, onSelectOnDragStart);
 
   const radius = imageCornerRadius(element);
 
   useEffect(() => {
-    const url = resolveImageSrc(element.src);
+    const url = isTemplateBaseImage(element.id)
+      ? element.src?.trim() ?? ""
+      : resolveImageSrc(element.src);
+    if (!url) {
+      setImage(null);
+      return;
+    }
+
     let cancelled = false;
 
-    void preloadImage(url).then((img) => {
+    void loadCanvasImage(url, element.width, element.height, url).then((img) => {
       if (!cancelled) setImage(img);
     });
 
     return () => {
       cancelled = true;
     };
-  }, [element.src]);
-
-  const handleDragMove = useCallback(
-    (e: KonvaEventObject<DragEvent>) => {
-      const node = e.target;
-      if (snapEnabled) {
-        const snapped = computeAlignmentSnap(elements, element.id, {
-          x: node.x(),
-          y: node.y(),
-          width: element.width,
-          height: element.height,
-        });
-        node.position({ x: snapped.x, y: snapped.y });
-        setAlignmentGuides(snapped.guides);
-      } else {
-        const clamped = clampElement({ ...element, x: node.x(), y: node.y() });
-        node.position({ x: clamped.x, y: clamped.y });
-      }
-    },
-    [elements, element, snapEnabled, setAlignmentGuides]
-  );
-
-  const handleDragEnd = useCallback(
-    (e: KonvaEventObject<DragEvent>) => {
-      clearAlignmentGuides();
-      commitElementMove(element.id, e.target.x(), e.target.y());
-    },
-    [element.id, commitElementMove, clearAlignmentGuides]
-  );
+  }, [element.id, element.src, element.width, element.height]);
 
   const crop = image ? getImageCrop(image, element.imageScale ?? 1) : null;
+  const isBase = isTemplateBaseImage(element.id);
+  const isProfilePhoto =
+    element.id === "avatar" || element.imageShape === "circle";
+  const placeholderFill = element.fill ?? (isProfilePhoto ? "#38bdf8" : "#f4f4f5");
+  const showChrome = !isBase && !isProfilePhoto && isSelected;
 
   return (
     <Group
+      ref={nodeRef}
       id={element.id}
       name={element.id}
-      x={element.x}
-      y={element.y}
       width={element.width}
       height={element.height}
+      opacity={element.opacity ?? 1}
       draggable={!element.locked && !disableDrag}
+      dragBoundFunc={dragBoundFunc}
       onClick={() => onSelect(element.id)}
       onTap={() => onSelect(element.id)}
+      onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
     >
       <Rect
         width={element.width}
         height={element.height}
-        fill={element.fill ?? "#f4f4f5"}
-        stroke={isSelected ? "#6366f1" : "#e4e4e7"}
-        strokeWidth={isSelected ? 2 : 1}
+        fill={isBase ? "transparent" : placeholderFill}
+        stroke={showChrome ? "#6366f1" : undefined}
+        strokeWidth={showChrome ? 2 : 0}
         cornerRadius={radius}
-        dash={image ? undefined : [6, 4]}
+        dash={!isBase && !isProfilePhoto && !image ? [6, 4] : undefined}
       />
       {image && crop ? (
         <KonvaImage
@@ -102,9 +91,11 @@ function ImageElementInner({ element, isSelected, onSelect, disableDrag }: Props
           width={element.width}
           height={element.height}
           cornerRadius={radius}
-          crop={crop}
+          crop={isBase ? undefined : crop}
+          imageSmoothingEnabled
+          listening={!element.locked}
         />
-      ) : (
+      ) : !isProfilePhoto ? (
         <Text
           width={element.width}
           height={element.height}
@@ -115,7 +106,7 @@ function ImageElementInner({ element, isSelected, onSelect, disableDrag }: Props
           verticalAlign="middle"
           listening={false}
         />
-      )}
+      ) : null}
     </Group>
   );
 }

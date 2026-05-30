@@ -4,6 +4,31 @@
  */
 import "./load-env.mjs";
 
+function postgresHasPassword(url) {
+  try {
+    return Boolean(new URL(url).password);
+  } catch {
+    return false;
+  }
+}
+
+function validateDbUrls() {
+  const db = process.env.DATABASE_URL?.trim();
+  const direct = process.env.DIRECT_URL?.trim();
+  const errors = [];
+  if (!db) errors.push("DATABASE_URL missing");
+  else if (!postgresHasPassword(db)) errors.push("DATABASE_URL missing password");
+  else if (!db.includes(":6543") && !db.includes("pgbouncer=true")) {
+    errors.push("DATABASE_URL should use pooler :6543 + ?pgbouncer=true");
+  }
+  if (!direct) errors.push("DIRECT_URL missing");
+  else if (!postgresHasPassword(direct)) errors.push("DIRECT_URL missing password");
+  else if (direct.includes("pooler.supabase.com")) {
+    errors.push("DIRECT_URL must use db.*.supabase.co:5432 (not pooler)");
+  }
+  return errors;
+}
+
 const REQUIRED = [
   "DATABASE_URL",
   "DIRECT_URL",
@@ -14,7 +39,6 @@ const REQUIRED = [
 const RECOMMENDED = [
   "NEXT_PUBLIC_APP_URL",
   "NEXTAUTH_URL",
-  "OPENAI_API_KEY",
   "CLOUDINARY_CLOUD_NAME",
   "CLOUDINARY_API_KEY",
   "CLOUDINARY_API_SECRET",
@@ -22,7 +46,6 @@ const RECOMMENDED = [
 
 const OPTIONAL = [
   "MONGODB_URI",
-  "NEXT_PUBLIC_POSTHOG_KEY",
   "SENTRY_DSN",
   "NEXT_PUBLIC_SENTRY_DSN",
 ];
@@ -74,10 +97,15 @@ if (isSet("SENTRY_DSN") && !isSet("SENTRY_AUTH_TOKEN")) {
   );
 }
 
-if (process.env.DATABASE_URL?.includes(":6543")) {
-  console.log("\n  OK       DATABASE_URL uses pooler port (6543)");
+const dbErrors = validateDbUrls();
+if (dbErrors.length) {
+  console.log("\nDatabase URL issues:");
+  for (const e of dbErrors) {
+    console.log(`  FAIL     ${e}`);
+    failed = true;
+  }
 } else if (isSet("DATABASE_URL")) {
-  console.log("\n  WARN     DATABASE_URL should use Supabase pooler (:6543) on Vercel");
+  console.log("\n  OK       DATABASE_URL + DIRECT_URL structure");
 }
 
 console.log("");

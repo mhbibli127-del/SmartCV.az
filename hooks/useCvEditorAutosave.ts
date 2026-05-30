@@ -8,6 +8,10 @@ import {
   revisionFromElements,
   syncResumeIdInUrl,
 } from "@/lib/resume-save-client";
+import {
+  isResumeDbAvailable,
+  markResumeDbUnavailable,
+} from "@/lib/resume-db-client";
 import type { SaveStatus } from "@/types/cv-editor";
 import type { ResumeContent } from "@/types/resume";
 
@@ -25,6 +29,7 @@ export function useCvEditorAutosave(title: string, enabled = true) {
   const cvIdRef = useRef<string | null>(null);
   const lastSavedFingerprintRef = useRef<string | null>(null);
   const lastSaveAtRef = useRef(0);
+  const dbAvailableRef = useRef<boolean | null>(null);
 
   const elements = useCvEditorStore((s) => s.elements);
   const background = useCvEditorStore((s) => s.background);
@@ -61,6 +66,19 @@ export function useCvEditorAutosave(title: string, enabled = true) {
         return;
       }
 
+      if (dbAvailableRef.current === false) {
+        setSaveStatus("idle");
+        return;
+      }
+
+      if (dbAvailableRef.current === null) {
+        dbAvailableRef.current = await isResumeDbAvailable();
+        if (!dbAvailableRef.current) {
+          setSaveStatus("idle");
+          return;
+        }
+      }
+
       savingRef.current = true;
       setSaveStatus("saving");
 
@@ -91,6 +109,10 @@ export function useCvEditorAutosave(title: string, enabled = true) {
         });
 
         if (!res.ok) {
+          if (res.status === 503) {
+            markResumeDbUnavailable();
+            dbAvailableRef.current = false;
+          }
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error ?? "Save failed");
         }

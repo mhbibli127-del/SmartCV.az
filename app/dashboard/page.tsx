@@ -1,9 +1,7 @@
-import { redirect } from "next/navigation";
-import { getServerSession } from "next-auth";
-import { getAuthOptions } from "@/lib/auth-options";
 import { listUserResumes } from "@/lib/resume-service";
 import { OverviewGallery } from "@/components/dashboard/OverviewGallery";
 import { createPageMetadata } from "@/lib/seo/metadata";
+import { requireAuthenticatedUser } from "@/lib/auth-server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,19 +13,16 @@ export const metadata = createPageMetadata({
 });
 
 export default async function DashboardPage() {
-  const session = await getServerSession(getAuthOptions());
-  if (!session?.user?.email) {
-    redirect("/login");
-  }
+  const user = await requireAuthenticatedUser();
 
   let resumes: Awaited<ReturnType<typeof listUserResumes>> = [];
   try {
-    resumes = await listUserResumes(session.user.email);
+    resumes = await listUserResumes(user.email);
   } catch (err) {
     console.error("[dashboard] failed to load resumes", err);
   }
 
   return (
-    <OverviewGallery initialResumes={resumes} userName={session.user.name} />
+    <OverviewGallery initialResumes={resumes} userName={user.name} />
   );
 }

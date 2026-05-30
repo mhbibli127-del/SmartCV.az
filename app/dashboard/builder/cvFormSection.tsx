@@ -52,7 +52,7 @@ function LivePreview({
                 />
               ))}
             </span>
-            AI thinking
+            Generating preview
           </span>
         )}
       </div>
@@ -166,7 +166,7 @@ export default function CVFormSection({
               Tell us about yourself
             </h2>
             <p className="text-sm text-zinc-500">
-              AI will transform your details into a polished, ATS-friendly CV.
+              Məlumatlarınızı ATS-uyğun, oxunaqlı CV strukturuna çeviririk.
             </p>
           </div>
 
@@ -267,7 +267,7 @@ export default function CVFormSection({
                 <label className="text-xs font-medium text-zinc-600">Work experience</label>
                 <textarea
                   rows={4}
-                  placeholder="Brief work history — AI will format this professionally."
+                  placeholder="İş təcrübənizi qısa yazın — strukturlaşdırılmış formata çevriləcək."
                   className={cn(fieldClass, "resize-none pl-3.5 leading-relaxed")}
                   value={formData.rawExperience}
                   onChange={(e) => setData({ ...formData, rawExperience: e.target.value })}
@@ -304,7 +304,7 @@ export default function CVFormSection({
               ) : (
                 <>
                   <Sparkles className="h-4 w-4" />
-                  Generate with AI
+                  Continue to preview
                 </>
               )}
             </Button>

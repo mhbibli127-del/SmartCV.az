@@ -3,9 +3,15 @@ import GoogleProvider from "next-auth/providers/google";
 import { isBuildPhase } from "@/lib/build";
 import { getNextAuthSecret, getNextAuthUrl } from "@/lib/env";
 import { ensureGoogleUser } from "@/lib/google-session-bridge";
-import { isGoogleOAuthConfigured, getGoogleClientId, getGoogleClientSecret } from "@/lib/google-oauth";
-
-let cachedOptions: NextAuthOptions | null = null;
+import {
+  resolveOAuthDestination,
+  sanitizeAuthRedirect,
+} from "@/lib/auth-redirect-path";
+import {
+  isGoogleOAuthConfigured,
+  getGoogleClientId,
+  getGoogleClientSecret,
+} from "@/lib/google-oauth";
 
 function buildProviders() {
   if (!isGoogleOAuthConfigured()) return [];
@@ -45,19 +51,19 @@ async function notifyGoogleLogin(email: string) {
 }
 
 /**
- * NextAuth configuration.
- *
- * Uses JWT sessions (not PrismaAdapter) so:
- * - Vercel builds never open a DB connection during page-data collection
- * - Serverless deploys work without SQLite file persistence
- * - Google users are persisted via ensureGoogleUser() in signIn callback
- * - JWT app cookies are issued via /api/auth/sync-session after OAuth redirect
+ * NextAuth configuration — never cached (avoids empty providers after cold start).
  */
 export function getAuthOptions(): NextAuthOptions {
-  if (cachedOptions) return cachedOptions;
+  const providers = buildProviders();
 
-  cachedOptions = {
-    providers: buildProviders(),
+  if (process.env.NODE_ENV === "development" && providers.length === 0) {
+    console.warn(
+      "[nextauth] Google provider not loaded — check GOOGLE_CLIENT_ID/SECRET in .env.local and restart dev server"
+    );
+  }
+
+  return {
+    providers,
     pages: {
       signIn: "/login",
       error: "/login",
@@ -109,26 +115,26 @@ export function getAuthOptions(): NextAuthOptions {
             : baseUrl || getNextAuthUrl()
         ).replace(/\/$/, "");
 
-        // Preserve OAuth error redirects to login
         if (url.includes("error=")) {
           if (url.startsWith("/")) return `${resolvedBase}${url}`;
           return url;
         }
 
-        // Skip re-sync if already routed through bridge
         if (url.includes("/api/auth/sync-session")) {
-          return url;
+          if (url.startsWith("http")) return url;
+          return `${resolvedBase}${url.startsWith("/") ? url : `/${url}`}`;
         }
 
         let nextPath = "/dashboard";
         if (url.startsWith(resolvedBase)) {
-          nextPath = url.slice(resolvedBase.length) || "/dashboard";
+          const pathAndQuery = url.slice(resolvedBase.length) || "/dashboard";
+          nextPath = resolveOAuthDestination(pathAndQuery.split("?")[0]);
         } else if (url.startsWith("/")) {
-          nextPath = url;
+          nextPath = resolveOAuthDestination(url.split("?")[0]);
         }
 
         const sync = new URL("/api/auth/sync-session", resolvedBase);
-        sync.searchParams.set("next", nextPath);
+        sync.searchParams.set("next", sanitizeAuthRedirect(nextPath));
         return sync.toString();
       },
       async jwt({ token, user, account }) {
@@ -155,6 +161,4 @@ export function getAuthOptions(): NextAuthOptions {
     secret: getNextAuthSecret(),
     debug: process.env.NODE_ENV === "development",
   };
-
-  return cachedOptions;
 }

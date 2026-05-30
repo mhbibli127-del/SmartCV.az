@@ -3,6 +3,11 @@ import {
   buildElementsFromTemplate,
   getEditorTemplate,
 } from "@/lib/cv-editor/template-catalog";
+import {
+  getTemplatePreviewSrc,
+  isTemplateBaseImage,
+  TEMPLATE_BASE_IMAGE_ID,
+} from "@/lib/cv-editor/template-base-layer";
 import { getDistinctTemplate } from "@/lib/cv-editor/template-definitions";
 import { resolveTemplateSlug } from "@/templates/data/catalog";
 import { SAMPLE, type ResumeSampleData } from "@/templates/shared";
@@ -10,28 +15,47 @@ import { getCoreTemplateBySlug } from "@/lib/design-engine/core-templates";
 import { getTemplateBySlug } from "@/lib/design-engine/template-catalog";
 import { extractResumeData } from "@/lib/cv-editor/resume-data";
 import type { CvEditorElement } from "@/types/cv-editor";
+import { normalizeElementGeometry } from "@/lib/canvas-layout";
+import { mapCvStyleToEditorProps } from "@/lib/cv-text-style";
+import { parseCssBorder, resolveLayoutShapeType } from "@/lib/cv-shape-style";
+
+function isLayoutBlock(el: CvEditorElement): boolean {
+  return el.type === "section" && !el.content?.trim() && Boolean(el.style.background);
+}
 
 export function cvElementsToEditorElements(elements: CvEditorElement[]): EditorElement[] {
-  return elements.map((el) => ({
-    id: el.id,
-    type: el.type === "section" ? "section" : el.type === "image" ? "image" : "text",
-    x: el.x,
-    y: el.y,
-    width: el.width,
-    height: el.height,
-    zIndex: el.zIndex,
-    text: el.content,
-    content: el.content,
-    fontSize: el.style.fontSize,
-    fontFamily: el.style.fontFamily,
-    fill: el.style.color,
-    fontWeight: el.style.fontWeight === "bold" ? "bold" : "normal",
-    lineHeight: el.style.lineHeight,
-    letterSpacing: el.style.letterSpacing,
-    locked: el.locked,
-    src: el.src,
-    sectionType: el.sectionType as EditorElement["sectionType"],
-  }));
+  return elements.map((el, index) => {
+    const layoutBlock = isLayoutBlock(el);
+    const styleProps = mapCvStyleToEditorProps(el.style);
+    const borderProps = layoutBlock ? parseCssBorder(el.style.border) : {};
+    const editorEl: EditorElement = {
+      id: el.id,
+      type: layoutBlock
+        ? "shape"
+        : el.type === "section"
+          ? "section"
+          : el.type === "image"
+            ? "image"
+            : "text",
+      x: el.x,
+      y: el.y,
+      width: el.width,
+      height: el.height,
+      zIndex: el.zIndex,
+      text: el.content,
+      content: el.content,
+      ...styleProps,
+      ...borderProps,
+      locked: el.locked ?? layoutBlock,
+      src: el.src,
+      sectionType: el.sectionType as EditorElement["sectionType"],
+      shapeType: layoutBlock ? resolveLayoutShapeType(el) : undefined,
+      ...(el.type === "image" && (el.style.borderRadius ?? 0) >= 999
+        ? { imageShape: "circle" as const, cornerRadius: el.width / 2 }
+        : {}),
+    };
+    return normalizeElementGeometry(editorEl, index);
+  });
 }
 
 export function buildStudioElementsForTemplate(slugOrId: string): EditorElement[] {
@@ -41,6 +65,21 @@ export function buildStudioElementsForTemplate(slugOrId: string): EditorElement[
   const built = buildElementsFromTemplate(editorTpl, SAMPLE);
   return cvElementsToEditorElements(built);
 }
+
+/** Preload preview image, then build editor elements (avoids blank canvas on template apply). */
+export async function buildStudioElementsForTemplateAsync(
+  slugOrId: string,
+  resumeData?: Partial<ResumeSampleData>
+): Promise<EditorElement[]> {
+  const slug = resolveTemplateSlug(slugOrId) ?? slugOrId;
+  const editorTpl = getEditorTemplate(slug);
+  if (!editorTpl) return [];
+
+  const built = buildElementsFromTemplate(editorTpl, resumeData);
+  return cvElementsToEditorElements(built);
+}
+
+export { TEMPLATE_BASE_IMAGE_ID, getTemplatePreviewSrc, isTemplateBaseImage };
 
 export function getDesignTemplateForSlug(slugOrId: string) {
   const slug = resolveTemplateSlug(slugOrId) ?? slugOrId;
@@ -115,7 +154,7 @@ export function preserveTextContent(
     ...el,
     text: textById.get(el.id) ?? el.text,
     content: textById.get(el.id) ?? el.content,
-    src: srcById.get(el.id) ?? el.src,
+    src: isTemplateBaseImage(el.id) ? el.src : srcById.get(el.id) ?? el.src,
   }));
 }
 

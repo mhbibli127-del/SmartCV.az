@@ -165,6 +165,45 @@ export const TEMPLATE_CATALOG: TemplateCatalogEntry[] = [
     premium: false,
     layout: "single-column",
   },
+  {
+    id: "tpl-sunset-gradient",
+    slug: "sunset-gradient",
+    name: "Sunset Gradient",
+    category: "Creative",
+    description:
+      "Vibrant coral-to-purple gradient header, overlapping photo, and floating white content card.",
+    previewImage: getTemplatePreviewPath("sunset-gradient"),
+    fontFamily: "Poppins",
+    atsOptimized: false,
+    premium: false,
+    layout: "card-grid",
+  },
+  {
+    id: "tpl-swiss-international",
+    slug: "swiss-international",
+    name: "Swiss International",
+    category: "Creative",
+    description:
+      "Bold Swiss poster aesthetic — red spine, yellow accent block, numbered grid sections.",
+    previewImage: getTemplatePreviewPath("swiss-international"),
+    fontFamily: "Inter",
+    atsOptimized: true,
+    premium: false,
+    layout: "single-column",
+  },
+  {
+    id: "tpl-art-deco-luxe",
+    slug: "art-deco-luxe",
+    name: "Art Deco Luxe",
+    category: "Executive",
+    description:
+      "Dark navy canvas with gold frame, geometric fans, and Gatsby-era luxury typography.",
+    previewImage: getTemplatePreviewPath("art-deco-luxe"),
+    fontFamily: "Playfair Display",
+    atsOptimized: false,
+    premium: true,
+    layout: "single-column",
+  },
 ];
 
 export function getCatalogEntry(slugOrId: string): TemplateCatalogEntry | undefined {

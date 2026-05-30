@@ -19,7 +19,7 @@ import { useDesignStore } from "@/lib/design-store";
 import { FONT_PAIRINGS, PALETTES } from "@/lib/design-engine/themes";
 import { Input } from "@/components/ui/input";
 import MediaUploadDropzone from "@/components/media/MediaUploadDropzone";
-import { AIImagePanel } from "@/components/ai/AIImagePanel";
+import { StudioBackgroundPanel } from "@/components/studio/StudioBackgroundPanel";
 import type { CVSectionType } from "@/types/cv-document";
 import { cn } from "@/lib/utils";
 
@@ -272,7 +272,7 @@ function CanvaSidebarInner({ cvId }: { cvId?: string | null }) {
                 hint="PNG, JPG, WebP — max 5MB"
                 onUploaded={(media) => addImageElement(media.optimizedUrl || media.secureUrl)}
               />
-              <AIImagePanel cvId={cvId} />
+              <StudioBackgroundPanel />
               {selectedId && elements.find((e) => e.id === selectedId)?.type === "image" && (
                 <Input
                   placeholder="Update image URL"

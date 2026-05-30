@@ -3,6 +3,7 @@
 import { memo, useEffect, useRef } from "react";
 import { Transformer } from "react-konva";
 import type Konva from "konva";
+import { readDragPosition } from "@/lib/canvas-drag";
 import { useEditorStore } from "@/lib/editor-store";
 import { MIN_ELEMENT_HEIGHT, MIN_ELEMENT_WIDTH } from "@/lib/layout-engine";
 
@@ -17,6 +18,13 @@ function SelectionTransformerInner({ layerRef }: Props) {
   const resizeElement = useEditorStore((s) => s.resizeElement);
 
   const selected = elements.find((e) => e.id === selectedId);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    if (!elements.some((e) => e.id === selectedId)) {
+      useEditorStore.getState().selectElement(null);
+    }
+  }, [selectedId, elements]);
 
   useEffect(() => {
     const tr = trRef.current;
@@ -64,12 +72,8 @@ function SelectionTransformerInner({ layerRef }: Props) {
         const width = Math.max(MIN_ELEMENT_WIDTH, node.width() * scaleX);
         const height = Math.max(MIN_ELEMENT_HEIGHT, node.height() * scaleY);
 
-        resizeElement(selectedId, {
-          x: node.x(),
-          y: node.y(),
-          width,
-          height,
-        });
+        const { x, y } = readDragPosition(node);
+        resizeElement(selectedId, { x, y, width, height });
       }}
     />
   );

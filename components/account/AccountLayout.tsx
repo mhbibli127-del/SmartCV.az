@@ -5,7 +5,6 @@ import {
   User,
   Shield,
   Bell,
-  Sparkles,
   Database,
 } from "lucide-react";
 import type { AccountNavItem, AccountSectionId } from "./types";
@@ -18,7 +17,6 @@ const NAV_ITEMS: AccountNavItem[] = [
     label: "Notifications",
     description: "Email and alert preferences",
   },
-  { id: "ai", label: "AI Preferences", description: "CV generation defaults" },
   { id: "privacy", label: "Data & Privacy", description: "Export and account data" },
 ];
 
@@ -26,7 +24,6 @@ const ICONS: Record<AccountSectionId, typeof User> = {
   profile: User,
   security: Shield,
   notifications: Bell,
-  ai: Sparkles,
   privacy: Database,
 };
 

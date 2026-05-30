@@ -1,8 +1,10 @@
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { getServerSession } from "next-auth";
+import { getToken } from "next-auth/jwt";
 import { getAuthOptions } from "@/lib/auth-options";
 import { verifyAccessToken } from "@/lib/auth";
+import { getNextAuthSecret } from "@/lib/env";
 import { verifySessionToken } from "@/lib/token";
 
 export type AuthenticatedUser = {
@@ -12,9 +14,28 @@ export type AuthenticatedUser = {
   image?: string | null;
 };
 
+async function userFromNextAuthJwt(
+  req: NextRequest
+): Promise<AuthenticatedUser | null> {
+  const jwt = await getToken({ req, secret: getNextAuthSecret() });
+  if (!jwt?.email) return null;
+  return {
+    email: String(jwt.email).toLowerCase().trim(),
+    userId: jwt.sub,
+    name: (jwt.name as string | null | undefined) ?? null,
+    image: (jwt.picture as string | null | undefined) ?? null,
+  };
+}
+
 export async function getAuthenticatedUser(
   req?: NextRequest
 ): Promise<AuthenticatedUser | null> {
+  // Route handlers: read NextAuth JWT from the incoming request (getServerSession is unreliable here).
+  if (req) {
+    const fromOAuth = await userFromNextAuthJwt(req);
+    if (fromOAuth) return fromOAuth;
+  }
+
   const session = await getServerSession(getAuthOptions());
   if (session?.user?.email) {
     return {

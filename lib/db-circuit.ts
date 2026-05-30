@@ -3,6 +3,9 @@
  * Opens circuit after repeated failures; auto-resets after cooldown.
  */
 
+import { validatePostgresEnv } from "@/lib/database-url";
+import { getDatabaseUrl } from "@/lib/env";
+
 const COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 const MAX_FAILURES = 2;
 
@@ -68,16 +71,11 @@ export function validatePostgresUrl(url: string | null | undefined): {
   ok: boolean;
   reason?: string;
 } {
-  if (!url?.trim()) {
-    return { ok: false, reason: "DATABASE_URL is not set" };
-  }
-  if (!url.startsWith("postgresql://") && !url.startsWith("postgres://")) {
-    return { ok: false, reason: "DATABASE_URL must be a PostgreSQL connection string" };
-  }
-  if (url.includes("[YOUR-PASSWORD]") || url.includes("YOUR_PASSWORD")) {
-    return { ok: false, reason: "DATABASE_URL still contains a placeholder password" };
-  }
-  return { ok: true };
+  const validation = validatePostgresEnv(
+    url ?? process.env.DATABASE_URL,
+    process.env.DIRECT_URL
+  );
+  return { ok: validation.ok, reason: validation.reason };
 }
 
 export class DatabaseUnavailableError extends Error {
@@ -93,7 +91,7 @@ export function assertDatabaseAvailable(): void {
   if (isPrismaCircuitOpen()) {
     throw new DatabaseUnavailableError();
   }
-  const validation = validatePostgresUrl(process.env.DATABASE_URL);
+  const validation = validatePostgresUrl(getDatabaseUrl());
   if (!validation.ok) {
     throw new DatabaseUnavailableError(validation.reason ?? "Database not configured");
   }

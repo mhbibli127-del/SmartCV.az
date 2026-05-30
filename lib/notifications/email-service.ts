@@ -32,7 +32,7 @@ function wrapHtml(title: string, body: string) {
       ${body}
       <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 24px 0;" />
       <p style="color: #94a3b8; font-size: 12px; text-align: center; margin: 0;">
-        SmartCV.AZ — Your AI-powered career platform
+        SmartCV.AZ — Professional CV builder
       </p>
     </div>
   `;

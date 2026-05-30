@@ -58,6 +58,7 @@ interface CvEditorState {
   zoomOut: () => void;
   fitScreen: () => void;
   toggleDarkMode: () => void;
+  setBackground: (background: string) => void;
   setSaveStatus: (status: SaveStatus, savedAt?: string) => void;
   setCvId: (id: string | null) => void;
   setTitle: (title: string) => void;
@@ -306,6 +307,7 @@ export const useCvEditorStore = create<CvEditorState>((set, get) => ({
   zoomOut: () => set((s) => ({ zoom: Math.max(0.35, s.zoom - 0.1) })),
   fitScreen: () => set({ zoom: 0.85 }),
   toggleDarkMode: () => set((s) => ({ darkMode: !s.darkMode })),
+  setBackground: (background) => set({ background }),
 
   setSaveStatus: (status, savedAt) =>
     set({ saveStatus: status, lastSavedAt: savedAt ?? get().lastSavedAt }),

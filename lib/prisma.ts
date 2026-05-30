@@ -1,9 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import { getDatabaseUrl } from "@/lib/env";
-import { isBuildPhase } from "@/lib/build";
 
-const globalForPrisma = globalThis as typeof globalThis & {
-  prisma?: PrismaClient;
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
 };
 
 function createPrismaClient(): PrismaClient {
@@ -19,19 +18,13 @@ function createPrismaClient(): PrismaClient {
 }
 
 /**
- * Singleton Prisma client — cached on globalThis in dev AND production.
- * Prevents hot-reload duplication locally and reuse within warm serverless instances.
+ * Singleton Prisma client — Supabase pooler (DATABASE_URL).
+ * Cached on globalThis to survive Next.js hot reload and warm serverless instances.
  */
-function getPrismaClient(): PrismaClient {
-  if (globalForPrisma.prisma) {
-    return globalForPrisma.prisma;
-  }
+export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
-  const client = createPrismaClient();
-  globalForPrisma.prisma = client;
-  return client;
+if (!globalForPrisma.prisma) {
+  globalForPrisma.prisma = prisma;
 }
-
-const prisma = isBuildPhase() ? createPrismaClient() : getPrismaClient();
 
 export default prisma;

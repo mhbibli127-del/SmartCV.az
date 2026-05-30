@@ -6,6 +6,9 @@ import { useEditorStore } from "@/lib/editor-store";
 import { Input } from "@/components/ui/input";
 import { StudioImageControls } from "@/components/studio/StudioImageControls";
 import { StudioSectionStylePanel } from "@/components/studio/StudioSectionStylePanel";
+import { StudioAlignControls } from "@/components/studio/StudioAlignControls";
+import { StudioTextStyleControls } from "@/components/studio/StudioTextStyleControls";
+import { colorHasAlpha, toHexColorForInput } from "@/lib/color-utils";
 
 function PropertiesInspectorInner({ cvId }: { cvId?: string | null }) {
   const selectedId = useEditorStore((s) => s.selectedId);
@@ -24,9 +27,20 @@ function PropertiesInspectorInner({ cvId }: { cvId?: string | null }) {
         <p className="mt-2 text-xs leading-relaxed text-zinc-500">
           Select an element on the canvas to edit its content, size, and position.
         </p>
+        <div className="mt-6 space-y-2 text-[11px] text-zinc-400">
+          <p className="font-semibold uppercase tracking-wide text-zinc-500">Shortcuts</p>
+          <p>Ctrl+Z — Undo</p>
+          <p>Ctrl+C / Ctrl+V — Copy / Paste</p>
+          <p>Ctrl+D — Duplicate</p>
+          <p>Arrow keys — Nudge (Shift = 8px)</p>
+          <p>[ ] — Layer order</p>
+          <p>Esc — Deselect</p>
+        </div>
       </aside>
     );
   }
+
+  const isTextLike = selected.type === "text" || selected.type === "section";
 
   return (
     <aside className="flex h-full w-[260px] shrink-0 flex-col border-l border-zinc-200 bg-white">
@@ -36,7 +50,7 @@ function PropertiesInspectorInner({ cvId }: { cvId?: string | null }) {
       </div>
 
       <div className="flex-1 space-y-4 overflow-y-auto p-4">
-        {(selected.type === "text" || selected.type === "section") && (
+        {isTextLike && (
           <div>
             <label className="text-[11px] font-medium uppercase text-zinc-400">Content</label>
             <textarea
@@ -62,6 +76,17 @@ function PropertiesInspectorInner({ cvId }: { cvId?: string | null }) {
           </div>
         )}
 
+        {isTextLike && (
+          <StudioTextStyleControls
+            textAlign={selected.textAlign ?? "left"}
+            fontWeight={selected.fontWeight ?? "normal"}
+            fontStyle={selected.fontStyle ?? "normal"}
+            onTextAlign={(align) => updateElement(selected.id, { textAlign: align })}
+            onFontWeight={(weight) => updateElement(selected.id, { fontWeight: weight })}
+            onFontStyle={(style) => updateElement(selected.id, { fontStyle: style })}
+          />
+        )}
+
         {selected.type === "section" && (
           <div>
             <label className="text-[11px] font-medium uppercase text-zinc-400">
@@ -77,7 +102,49 @@ function PropertiesInspectorInner({ cvId }: { cvId?: string | null }) {
           <StudioImageControls cvId={cvId} compact />
         )}
 
-        {(selected.type === "text" || selected.type === "section") && (
+        {(selected.type === "shape" || selected.type === "divider") && (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-[11px] font-medium uppercase text-zinc-400">Fill</label>
+              <input
+                type="color"
+                value={toHexColorForInput(selected.fill)}
+                onChange={(e) => updateElement(selected.id, { fill: e.target.value })}
+                className="mt-1.5 h-9 w-full cursor-pointer rounded-lg border border-zinc-200"
+              />
+            </div>
+            {selected.type === "shape" && (
+              <div>
+                <label className="text-[11px] font-medium uppercase text-zinc-400">Stroke</label>
+                <input
+                  type="color"
+                  value={toHexColorForInput(selected.stroke ?? "#4f46e5")}
+                  onChange={(e) => updateElement(selected.id, { stroke: e.target.value })}
+                  className="mt-1.5 h-9 w-full cursor-pointer rounded-lg border border-zinc-200"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {selected.type === "shape" && (
+          <label className="block text-xs text-zinc-600">
+            Opacity
+            <input
+              type="range"
+              min={0.1}
+              max={1}
+              step={0.05}
+              value={selected.opacity ?? 1}
+              onChange={(e) =>
+                updateElement(selected.id, { opacity: Number(e.target.value) })
+              }
+              className="mt-2 w-full accent-zinc-900"
+            />
+          </label>
+        )}
+
+        {isTextLike && (
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[11px] font-medium uppercase text-zinc-400">Size</label>
@@ -94,13 +161,22 @@ function PropertiesInspectorInner({ cvId }: { cvId?: string | null }) {
               <label className="text-[11px] font-medium uppercase text-zinc-400">Color</label>
               <input
                 type="color"
-                value={selected.fill ?? "#18181b"}
+                value={toHexColorForInput(selected.fill)}
                 onChange={(e) => updateElement(selected.id, { fill: e.target.value })}
                 className="mt-1.5 h-9 w-full cursor-pointer rounded-lg border border-zinc-200"
               />
+              {colorHasAlpha(selected.fill) && (
+                <p className="mt-1 text-[10px] text-zinc-400">
+                  Original uses transparency; picker shows blended color.
+                </p>
+              )}
             </div>
           </div>
         )}
+
+        <StudioAlignControls compact />
+
+        <StudioAlignControls compact />
 
         <div>
           <label className="text-[11px] font-medium uppercase text-zinc-400">Position & size</label>

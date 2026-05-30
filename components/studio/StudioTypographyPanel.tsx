@@ -3,9 +3,25 @@
 import { memo, useMemo, useState } from "react";
 import { useEditorStore } from "@/lib/editor-store";
 import { useDesignStore } from "@/lib/design-store";
-import { STUDIO_FONT_CATALOG, loadFontOption } from "@/lib/studio-fonts";
+import {
+  STUDIO_FONT_CATALOG,
+  loadFontOption,
+  loadFontByName,
+  resolveStudioFontCss,
+  type StudioFontOption,
+} from "@/lib/studio-fonts";
+import { FONT_PAIRINGS } from "@/lib/design-engine/themes";
+import { StudioTextStyleControls } from "@/components/studio/StudioTextStyleControls";
 import { cn } from "@/lib/utils";
 import type { EditorElement } from "@/types/cv-document";
+
+const FONT_CATEGORIES = [
+  { id: "all", label: "All" },
+  { id: "sans", label: "Sans" },
+  { id: "serif", label: "Serif" },
+  { id: "mono", label: "Mono" },
+  { id: "display", label: "Display" },
+] as const;
 
 function PanelHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -17,6 +33,7 @@ function PanelHeading({ children }: { children: React.ReactNode }) {
 
 function StudioTypographyPanelInner() {
   const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<(typeof FONT_CATEGORIES)[number]["id"]>("all");
   const selectedId = useEditorStore((s) => s.selectedId);
   const elements = useEditorStore((s) => s.elements);
   const updateElement = useEditorStore((s) => s.updateElement);
@@ -33,10 +50,12 @@ function StudioTypographyPanelInner() {
   const lineHeight = selected?.lineHeight ?? 1.35;
   const letterSpacing = selected?.letterSpacing ?? 0;
   const fontWeight = selected?.fontWeight ?? "normal";
+  const fontStyle = selected?.fontStyle ?? "normal";
+  const textAlign = selected?.textAlign ?? "left";
 
-  const applyToSelected = (patch: Partial<EditorElement>) => {
+  const applyToSelected = (patch: Partial<EditorElement>, recordHistory = true) => {
     if (isTextLike && selected) {
-      updateElement(selected.id, patch);
+      updateElement(selected.id, patch, recordHistory);
       return;
     }
     if (patch.fontFamily) {
@@ -51,14 +70,51 @@ function StudioTypographyPanelInner() {
     }
   };
 
+  const applyFontPairing = (heading: string, body: string) => {
+    loadFontByName(heading);
+    loadFontByName(body);
+    setFontPairing(heading, body);
+    applyThemeToCanvas();
+  };
+
   const filteredFonts = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return STUDIO_FONT_CATALOG;
-    return STUDIO_FONT_CATALOG.filter((f) => f.label.toLowerCase().includes(q));
-  }, [query]);
+    return STUDIO_FONT_CATALOG.filter((f) => {
+      const matchesQuery =
+        !q || f.label.toLowerCase().includes(q) || f.css.toLowerCase().includes(q);
+      const matchesCategory = category === "all" || f.category === category;
+      return matchesQuery && matchesCategory;
+    });
+  }, [query, category]);
 
   return (
     <div className="space-y-4">
+      <PanelHeading>Font pairings</PanelHeading>
+      <div className="grid grid-cols-2 gap-2">
+        {FONT_PAIRINGS.map((pair) => (
+          <button
+            key={pair.id}
+            type="button"
+            onClick={() => applyFontPairing(pair.heading, pair.body)}
+            className="rounded-lg border border-zinc-200 px-2 py-2 text-left transition hover:border-zinc-300 hover:bg-zinc-50"
+          >
+            <span className="block text-[10px] font-semibold text-zinc-800">{pair.label}</span>
+            <span
+              className="mt-0.5 block truncate text-[10px] text-zinc-500"
+              style={{ fontFamily: resolveStudioFontCss(pair.heading) }}
+            >
+              {pair.heading}
+            </span>
+            <span
+              className="block truncate text-[10px] text-zinc-400"
+              style={{ fontFamily: resolveStudioFontCss(pair.body) }}
+            >
+              {pair.body}
+            </span>
+          </button>
+        ))}
+      </div>
+
       <PanelHeading>Font family</PanelHeading>
       <input
         type="search"
@@ -67,8 +123,25 @@ function StudioTypographyPanelInner() {
         onChange={(e) => setQuery(e.target.value)}
         className="h-9 w-full rounded-lg border border-zinc-200 px-3 text-xs focus:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900/5"
       />
-      <div className="grid max-h-48 grid-cols-2 gap-2 overflow-y-auto pr-1">
-        {filteredFonts.map((font) => (
+      <div className="flex flex-wrap gap-1">
+        {FONT_CATEGORIES.map((cat) => (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => setCategory(cat.id)}
+            className={cn(
+              "rounded-full border px-2.5 py-0.5 text-[10px] font-medium transition",
+              category === cat.id
+                ? "border-zinc-900 bg-zinc-900 text-white"
+                : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+            )}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+      <div className="grid max-h-52 grid-cols-2 gap-2 overflow-y-auto pr-1">
+        {filteredFonts.map((font: StudioFontOption) => (
           <button
             key={font.id}
             type="button"
@@ -88,6 +161,15 @@ function StudioTypographyPanelInner() {
           </button>
         ))}
       </div>
+
+      <StudioTextStyleControls
+        textAlign={textAlign}
+        fontWeight={fontWeight}
+        fontStyle={fontStyle}
+        onTextAlign={(align) => applyToSelected({ textAlign: align })}
+        onFontWeight={(weight) => applyToSelected({ fontWeight: weight })}
+        onFontStyle={(style) => applyToSelected({ fontStyle: style })}
+      />
 
       <PanelHeading>Settings</PanelHeading>
       <label className="block text-xs text-zinc-600">
@@ -132,27 +214,19 @@ function StudioTypographyPanelInner() {
         <span className="mt-1 block text-zinc-400">{letterSpacing.toFixed(1)}px</span>
       </label>
 
-      <label className="block text-xs text-zinc-600">
-        Font weight
-        <select
-          value={fontWeight}
-          onChange={(e) =>
-            applyToSelected({ fontWeight: e.target.value as "normal" | "bold" })
-          }
-          className="mt-1.5 w-full rounded-xl border border-zinc-200 px-3 py-2 text-sm"
-        >
-          <option value="normal">Regular</option>
-          <option value="bold">Bold</option>
-        </select>
-      </label>
-
       <div
         className="rounded-xl border border-dashed border-zinc-200 bg-zinc-50 p-4"
-        style={{ fontFamily, fontSize, lineHeight, letterSpacing }}
+        style={{
+          fontFamily,
+          fontSize,
+          lineHeight,
+          letterSpacing,
+          textAlign,
+          fontStyle: fontStyle === "italic" ? "italic" : "normal",
+          fontWeight: fontWeight === "bold" ? 700 : 400,
+        }}
       >
-        <p className={fontWeight === "bold" ? "font-bold" : ""}>
-          The quick brown fox jumps over the lazy dog.
-        </p>
+        <p>The quick brown fox jumps over the lazy dog.</p>
       </div>
 
       {!isTextLike && (

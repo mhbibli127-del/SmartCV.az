@@ -2,11 +2,11 @@
 
 import { memo, useCallback } from "react";
 import { Text, Group, Rect } from "react-konva";
-import type { KonvaEventObject } from "konva/lib/Node";
 import type { EditorElement } from "@/types/cv-document";
 import { useEditorStore } from "@/lib/editor-store";
-import { clampElement, computeAlignmentSnap } from "@/lib/layout-engine";
+import { useCanvasElementDrag } from "@/lib/canvas-drag";
 import { isPlaceholderContent } from "@/lib/section-styles";
+import { konvaFontStyle } from "@/lib/cv-text-style";
 
 type Props = {
   element: EditorElement;
@@ -16,53 +16,33 @@ type Props = {
 };
 
 function TextElementInner({ element, isSelected, onSelect, disableDrag }: Props) {
-  const elements = useEditorStore((s) => s.elements);
-  const snapEnabled = useEditorStore((s) => s.snapEnabled);
-  const setAlignmentGuides = useEditorStore((s) => s.setAlignmentGuides);
-  const commitElementMove = useEditorStore((s) => s.commitElementMove);
-  const clearAlignmentGuides = useEditorStore((s) => s.clearAlignmentGuides);
+  const layoutMode = useEditorStore((s) => s.layoutMode);
   const setEditingId = useEditorStore((s) => s.setEditingId);
 
-  const handleDragMove = useCallback(
-    (e: KonvaEventObject<DragEvent>) => {
-      const node = e.target;
-      let x = node.x();
-      let y = node.y();
+  const onSelectOnDragStart = useCallback((id: string) => onSelect(id), [onSelect]);
+  const {
+    nodeRef,
+    dragBoundFunc,
+    handleDragStart,
+    handleDragMove,
+    handleDragEnd,
+  } = useCanvasElementDrag(element, onSelectOnDragStart);
 
-      if (snapEnabled) {
-        const snapped = computeAlignmentSnap(elements, element.id, {
-          x,
-          y,
-          width: element.width,
-          height: element.height,
-        });
-        node.position({ x: snapped.x, y: snapped.y });
-        setAlignmentGuides(snapped.guides);
-      } else {
-        const clamped = clampElement({ ...element, x, y });
-        node.position({ x: clamped.x, y: clamped.y });
-      }
-    },
-    [elements, element, snapEnabled, setAlignmentGuides]
-  );
-
-  const handleDragEnd = useCallback(
-    (e: KonvaEventObject<DragEvent>) => {
-      clearAlignmentGuides();
-      commitElementMove(element.id, e.target.x(), e.target.y());
-    },
-    [element.id, commitElementMove, clearAlignmentGuides]
-  );
+  const usePlaceholder =
+    layoutMode === "flow" && isPlaceholderContent(element.text);
+  const displayText = usePlaceholder ? "Click to edit" : (element.text ?? "");
+  const textFill = usePlaceholder ? "#a1a1aa" : (element.fill ?? "#18181b");
 
   return (
     <Group
+      ref={nodeRef}
       id={element.id}
       name={element.id}
-      x={element.x}
-      y={element.y}
       width={element.width}
       height={element.height}
+      opacity={element.opacity ?? 1}
       draggable={!element.locked && !disableDrag}
+      dragBoundFunc={dragBoundFunc}
       onClick={() => {
         onSelect(element.id);
         if (isSelected && !element.locked) setEditingId(element.id);
@@ -71,9 +51,9 @@ function TextElementInner({ element, isSelected, onSelect, disableDrag }: Props)
         onSelect(element.id);
         if (isSelected && !element.locked) setEditingId(element.id);
       }}
+      onDragStart={handleDragStart}
       onDragMove={handleDragMove}
       onDragEnd={handleDragEnd}
-      onDragStart={() => onSelect(element.id)}
       onDblClick={() => setEditingId(element.id)}
       onDblTap={() => setEditingId(element.id)}
     >
@@ -87,38 +67,21 @@ function TextElementInner({ element, isSelected, onSelect, disableDrag }: Props)
           listening={false}
         />
       )}
-      {element.locked && (
-        <Rect
-          width={element.width}
-          height={element.height}
-          fill="rgba(0,0,0,0.03)"
-          listening={false}
-        />
-      )}
       <Text
         width={element.width}
         height={element.height}
-        text={
-          isPlaceholderContent(element.text) ? "Click to edit" : (element.text ?? "")
-        }
+        text={displayText}
         fontSize={element.fontSize ?? 13}
-        fontFamily={element.fontFamily ?? "Inter"}
-        fill={
-          isPlaceholderContent(element.text)
-            ? "#a1a1aa"
-            : (element.fill ?? "#18181b")
-        }
-        fontStyle={
-          isPlaceholderContent(element.text)
-            ? "italic"
-            : element.fontWeight === "bold"
-              ? "bold"
-              : "normal"
-        }
+        fontFamily={element.fontFamily ?? "Inter, sans-serif"}
+        fill={textFill}
+        fontStyle={usePlaceholder ? "italic" : konvaFontStyle(element)}
+        align={element.textAlign ?? "left"}
+        verticalAlign="top"
         lineHeight={element.lineHeight}
         letterSpacing={element.letterSpacing}
         wrap="word"
         listening={false}
+        perfectDrawEnabled
       />
     </Group>
   );

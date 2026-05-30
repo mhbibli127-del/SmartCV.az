@@ -1,37 +1,27 @@
 "use client";
 
 import { memo } from "react";
-import dynamic from "next/dynamic";
-import { Loader2 } from "lucide-react";
 import type { CanvasEditorHandle } from "@/components/editor/CanvasEditor";
+import { CanvasEditorLazy } from "@/components/editor/CanvasEditorLazy";
 import { StudioPageNavigator } from "@/components/studio/StudioPageNavigator";
 import { StudioRulers } from "@/components/studio/StudioRulers";
 import { StudioOverflowBanner } from "@/components/studio/StudioOverflowBanner";
 import { useEditorStore } from "@/lib/editor-store";
 import { A4_HEIGHT, A4_WIDTH } from "@/lib/layout-engine";
 
-const CanvasEditor = dynamic(
-  () => import("@/components/editor/CanvasEditor").then((m) => m.CanvasEditor),
-  {
-    ssr: false,
-    loading: () => (
-      <div
-        className="flex items-center justify-center bg-white"
-        style={{ width: A4_WIDTH, height: A4_HEIGHT }}
-      >
-        <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
-      </div>
-    ),
-  }
-);
-
 interface StudioCanvasAreaProps {
   canvasRef: React.RefObject<CanvasEditorHandle>;
   zoom: number;
+  canvasKey: string;
   onCanvasReady?: () => void;
 }
 
-function StudioCanvasAreaInner({ canvasRef, zoom, onCanvasReady }: StudioCanvasAreaProps) {
+function StudioCanvasAreaInner({
+  canvasRef,
+  zoom,
+  canvasKey,
+  onCanvasReady,
+}: StudioCanvasAreaProps) {
   const showRulers = useEditorStore((s) => s.showRulers);
   const activePage = useEditorStore((s) => s.activePage);
   const pageCount = useEditorStore((s) => s.pageCount);
@@ -53,6 +43,7 @@ function StudioCanvasAreaInner({ canvasRef, zoom, onCanvasReady }: StudioCanvasA
               transform: `scale(${zoom})`,
               transformOrigin: "top center",
               transition: "transform 0.2s ease-out",
+              backfaceVisibility: "hidden",
             }}
           >
             <div
@@ -62,9 +53,16 @@ function StudioCanvasAreaInner({ canvasRef, zoom, onCanvasReady }: StudioCanvasA
                 height: A4_HEIGHT,
                 boxShadow:
                   "0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.12), 0 24px 48px rgba(0,0,0,0.08)",
+                isolation: "isolate",
               }}
             >
-              <CanvasEditor ref={canvasRef} embedded zoom={zoom} onReady={onCanvasReady} />
+              <CanvasEditorLazy
+                key={canvasKey}
+                ref={canvasRef}
+                embedded
+                zoom={zoom}
+                onReady={onCanvasReady}
+              />
             </div>
           </div>
           {pageCount > 1 && (

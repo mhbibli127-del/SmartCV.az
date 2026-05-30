@@ -87,11 +87,12 @@ export default function RegisterPage() {
           </h1>
 
           <p className="text-lg text-gray-600 max-w-md">
-            AI köməkçisi ilə professional CV-lər hazırlayın, ATS yoxlanışından keçin və karyeranıza yeni bir addım atın.
+            Peşəkar şablonlar və Studio redaktoru ilə CV-nizi işə uyğun formata gətirin —
+            ATS layout və PDF ixracı bir yerdə.
           </p>
 
           <AuthFeatureList
-            items={["Sürətli Qeydiyyat", "ATS Hesabatı", "AI Məsləhətləri"]}
+            items={["Sürətli qeydiyyat", "ATS layout", "PDF ixrac"]}
           />
         </motion.div>
 

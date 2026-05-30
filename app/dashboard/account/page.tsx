@@ -5,11 +5,9 @@ import AccountLayout from "@/components/account/AccountLayout";
 import ProfileSection from "@/components/account/ProfileSection";
 import SecuritySection from "@/components/account/SecuritySection";
 import NotificationSection from "@/components/account/NotificationSection";
-import AIPreferencesSection from "@/components/account/AIPreferencesSection";
 import DataPrivacySection from "@/components/account/DataPrivacySection";
 import type {
   AccountSectionId,
-  AiPreferences,
   NotificationPrefs,
   UserProfile,
 } from "@/components/account/types";
@@ -21,13 +19,6 @@ const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
   jobAlerts: true,
   cvFeedback: true,
   marketing: false,
-};
-
-const DEFAULT_AI_PREFS: AiPreferences = {
-  cvStyle: "modern",
-  tone: "formal",
-  language: "en",
-  autoImprove: true,
 };
 
 function buildAvatarUrl(email: string) {
@@ -58,8 +49,6 @@ function AccountPageContent() {
   });
   const [savedProfile, setSavedProfile] = useState(profile);
   const [notifications, setNotifications] = useState<NotificationPrefs>(DEFAULT_NOTIFICATIONS);
-  const [aiPrefs, setAiPrefs] = useState<AiPreferences>(DEFAULT_AI_PREFS);
-
   useEffect(() => {
     const loadUser = async () => {
       const { ok, data } = await api.get<{ email?: string; name?: string }>("/api/auth/me");
@@ -102,7 +91,6 @@ function AccountPageContent() {
       localStorage.getItem("auth_email");
     if (!storedEmail) {
       setNotifications(loadStoredPrefs("smartcv_notifications", DEFAULT_NOTIFICATIONS));
-      setAiPrefs(loadStoredPrefs("smartcv_ai_prefs", DEFAULT_AI_PREFS));
       return;
     }
     const email = storedEmail.toLowerCase().trim();
@@ -119,7 +107,6 @@ function AccountPageContent() {
           : buildAvatarUrl(email),
     }));
     setNotifications(loadStoredPrefs("smartcv_notifications", DEFAULT_NOTIFICATIONS));
-    setAiPrefs(loadStoredPrefs("smartcv_ai_prefs", DEFAULT_AI_PREFS));
   }, []);
 
   const handleProfileSave = useCallback(async () => {
@@ -154,11 +141,6 @@ function AccountPageContent() {
     success("Preferences saved", "Notification settings updated.");
   }, [notifications, success]);
 
-  const handleAiPrefsSave = useCallback(() => {
-    localStorage.setItem("smartcv_ai_prefs", JSON.stringify(aiPrefs));
-    success("Preferences saved", "AI settings updated.");
-  }, [aiPrefs, success]);
-
   const renderSection = () => {
     switch (activeSection) {
       case "profile":
@@ -180,10 +162,6 @@ function AccountPageContent() {
             onChange={setNotifications}
             onSave={handleNotificationsSave}
           />
-        );
-      case "ai":
-        return (
-          <AIPreferencesSection prefs={aiPrefs} onChange={setAiPrefs} onSave={handleAiPrefsSave} />
         );
       case "privacy":
         return <DataPrivacySection />;

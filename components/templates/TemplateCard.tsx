@@ -11,9 +11,10 @@ interface TemplateCardProps {
   template: CvEditorTemplate;
   onUse: () => void;
   onPreview: () => void;
+  priority?: boolean;
 }
 
-function TemplateCardInner({ template, onUse, onPreview }: TemplateCardProps) {
+function TemplateCardInner({ template, onUse, onPreview, priority }: TemplateCardProps) {
   const [hover, setHover] = useState(false);
 
   return (
@@ -33,7 +34,7 @@ function TemplateCardInner({ template, onUse, onPreview }: TemplateCardProps) {
           animate={{ scale: hover ? 1.02 : 1 }}
           transition={{ duration: 0.3, ease: "easeOut" }}
         >
-          <CvTemplateThumbnail template={template} />
+          <CvTemplateThumbnail template={template} priority={priority} />
         </motion.div>
 
         <span className="absolute left-5 top-5 rounded-full bg-white/95 px-2 py-0.5 text-[10px] font-semibold text-zinc-600 shadow-sm backdrop-blur">

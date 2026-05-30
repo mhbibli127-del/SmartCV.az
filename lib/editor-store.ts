@@ -2,17 +2,27 @@ import { create } from "zustand";
 import type { EditorElement } from "@/types/cv-document";
 import type { AlignmentGuide } from "@/lib/layout-engine";
 import {
-  autoSpacing,
-  clampElement,
   createDefaultCanvas,
   nextZIndex,
   snapElementToGrid,
   CANVAS_PADDING,
   SECTION_GAP,
 } from "@/lib/layout-engine";
+import {
+  applyLayoutPipeline,
+  clampForLayoutMode,
+  type CanvasLayoutMode,
+} from "@/lib/canvas-layout";
 import { getOverflowElements, repositionForPage } from "@/lib/page-overflow";
+import {
+  alignElementX,
+  alignElementY,
+  type HorizontalAlign,
+  type VerticalAlign,
+} from "@/lib/studio-align";
 
 const MAX_HISTORY = 30;
+let elementClipboard: EditorElement | null = null;
 
 export type SidebarTab = "design" | "elements" | "layout" | "layers";
 
@@ -29,15 +39,34 @@ interface EditorStore {
   pageCount: number;
   activePage: number;
   showRulers: boolean;
+  showGrid: boolean;
   isExporting: boolean;
+  renderVersion: number;
+  activeTemplateSlug: string | null;
+  layoutMode: CanvasLayoutMode;
+  canvasBackground: string;
 
-  loadElements: (elements: EditorElement[]) => void;
+  loadElements: (
+    elements: EditorElement[],
+    opts?: { background?: string; keepDirty?: boolean }
+  ) => void;
+  setCanvasBackground: (background: string) => void;
+  replaceCanvasForTemplate: (elements: EditorElement[]) => void;
+  hydrateTemplateCanvas: (elements: EditorElement[], templateSlug: string) => number;
+  resetEditorState: () => void;
+  clearInteractionState: () => void;
+  setElementsInPlace: (elements: EditorElement[]) => void;
   setExporting: (value: boolean) => void;
   moveOverflowToNextPage: () => void;
   setActivePage: (page: number) => void;
   addPage: () => void;
   toggleRulers: () => void;
+  toggleShowGrid: () => void;
   toggleSnap: () => void;
+  copyElement: (id: string) => void;
+  pasteElement: () => void;
+  alignSelectedHorizontally: (mode: HorizontalAlign) => void;
+  alignSelectedVertically: (mode: VerticalAlign) => void;
   selectElement: (id: string | null) => void;
   setSidebarTab: (tab: SidebarTab) => void;
   setAlignmentGuides: (guides: AlignmentGuide[]) => void;
@@ -48,7 +77,7 @@ interface EditorStore {
     id: string,
     bounds: Pick<EditorElement, "x" | "y" | "width" | "height">
   ) => void;
-  addTextElement: () => void;
+  addTextElement: (preset?: Partial<EditorElement>) => void;
   addSectionBlock: (sectionType: EditorElement["sectionType"], defaultContent?: string) => void;
   addShapeElement: (shapeType?: EditorElement["shapeType"]) => void;
   addImageElement: (src?: string) => void;
@@ -58,6 +87,8 @@ interface EditorStore {
   toggleElementLock: (id: string) => void;
   removeElement: (id: string) => void;
   reorderElements: (orderedIds: string[]) => void;
+  /** Layer list order: front (top) → back (bottom). */
+  reorderLayers: (orderedIdsFrontToBack: string[]) => void;
   bringForward: (id: string) => void;
   sendBackward: (id: string) => void;
   undo: () => void;
@@ -77,15 +108,26 @@ function pushHistory(state: EditorStore, nextElements: EditorElement[]) {
   return { elements: nextElements, past, future: [], isDirty: true };
 }
 
+function layoutElements(
+  state: EditorStore,
+  elements: EditorElement[]
+): EditorElement[] {
+  return applyLayoutPipeline(elements, state.layoutMode);
+}
+
 function applyPatch(
   state: EditorStore,
   id: string,
   patch: Partial<EditorElement>,
   recordHistory: boolean
 ) {
-  const snap = state.snapEnabled ? snapElementToGrid : clampElement;
-  const next = autoSpacing(
-    state.elements.map((el) => (el.id === id ? snap({ ...el, ...patch }) : el))
+  const clamp = (el: EditorElement) =>
+    state.snapEnabled && state.layoutMode === "flow"
+      ? snapElementToGrid(el)
+      : clampForLayoutMode(el, state.layoutMode);
+  const next = layoutElements(
+    state,
+    state.elements.map((el) => (el.id === id ? clamp({ ...el, ...patch }) : el))
   );
   return recordHistory ? pushHistory(state, next) : { ...state, elements: next, isDirty: true };
 }
@@ -103,20 +145,114 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   pageCount: 1,
   activePage: 1,
   showRulers: false,
+  showGrid: false,
   isExporting: false,
+  renderVersion: 0,
+  activeTemplateSlug: null,
+  layoutMode: "flow",
+  canvasBackground: "#ffffff",
 
-  loadElements: (elements) => {
-    const maxPage = Math.max(1, ...elements.map((e) => e.page ?? 1));
-    set({
-      elements: autoSpacing(elements),
+  resetEditorState: () =>
+    set((state) => ({
+      elements: [],
+      selectedId: null,
+      editingId: null,
+      alignmentGuides: [],
       past: [],
       future: [],
       isDirty: false,
+      isExporting: false,
+      pageCount: 1,
+      activePage: 1,
+      activeTemplateSlug: null,
+      layoutMode: "flow",
+      canvasBackground: "#ffffff",
+      renderVersion: state.renderVersion + 1,
+    })),
+
+  hydrateTemplateCanvas: (elements, templateSlug) => {
+    const maxPage = Math.max(1, ...elements.map((e) => e.page ?? 1));
+    let nextVersion = 0;
+    set((state) => {
+      nextVersion = state.renderVersion + 1;
+      return {
+        elements: applyLayoutPipeline(
+          elements.map((e) => ({ ...e })),
+          "absolute"
+        ),
+        selectedId: null,
+        editingId: null,
+        alignmentGuides: [],
+        past: [],
+        future: [],
+        isDirty: true,
+        isExporting: false,
+        pageCount: maxPage,
+        activePage: 1,
+        activeTemplateSlug: templateSlug,
+        layoutMode: "absolute",
+        renderVersion: nextVersion,
+      };
+    });
+    return nextVersion;
+  },
+
+  loadElements: (elements, opts) => {
+    const maxPage = Math.max(1, ...elements.map((e) => e.page ?? 1));
+    const mode: CanvasLayoutMode = elements.some(
+      (e) => e.id === "template-base" || e.x === 0
+    )
+      ? "absolute"
+      : "flow";
+    set((state) => ({
+      elements: applyLayoutPipeline(elements.map((e) => ({ ...e })), mode),
+      selectedId: null,
       editingId: null,
+      alignmentGuides: [],
+      past: [],
+      future: [],
+      isDirty: opts?.keepDirty ? state.isDirty : false,
+      isExporting: false,
       pageCount: maxPage,
       activePage: 1,
+      layoutMode: mode,
+      canvasBackground: opts?.background ?? state.canvasBackground,
+    }));
+  },
+
+  setCanvasBackground: (background) =>
+    set({ canvasBackground: background, isDirty: true }),
+
+  replaceCanvasForTemplate: (elements) => {
+    const maxPage = Math.max(1, ...elements.map((e) => e.page ?? 1));
+    set({
+      elements: applyLayoutPipeline(elements.map((e) => ({ ...e })), "absolute"),
+      selectedId: null,
+      editingId: null,
+      alignmentGuides: [],
+      past: [],
+      future: [],
+      isDirty: true,
+      isExporting: false,
+      pageCount: maxPage,
+      activePage: 1,
+      layoutMode: "absolute",
     });
   },
+
+  clearInteractionState: () =>
+    set({
+      selectedId: null,
+      editingId: null,
+      alignmentGuides: [],
+      isExporting: false,
+    }),
+
+  setElementsInPlace: (elements) =>
+    set((state) => ({
+      elements: layoutElements(state, elements.map((e) => ({ ...e }))),
+      isDirty: true,
+    })),
 
   setActivePage: (page) =>
     set((s) => ({
@@ -133,6 +269,47 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     })),
 
   toggleRulers: () => set((s) => ({ showRulers: !s.showRulers })),
+
+  toggleShowGrid: () => set((s) => ({ showGrid: !s.showGrid })),
+
+  copyElement: (id) => {
+    const el = get().elements.find((e) => e.id === id);
+    if (el) elementClipboard = snapshot([el])[0];
+  },
+
+  pasteElement: () => {
+    if (!elementClipboard) return;
+    set((state) => {
+      const copy: EditorElement = {
+        ...elementClipboard!,
+        id: `${elementClipboard!.type}-${Date.now()}`,
+        x: elementClipboard!.x + 16,
+        y: elementClipboard!.y + 16,
+        zIndex: nextZIndex(state.elements),
+        page: state.activePage,
+      };
+      return {
+        ...pushHistory(state, layoutElements(state, [...state.elements, copy])),
+        selectedId: copy.id,
+      };
+    });
+  },
+
+  alignSelectedHorizontally: (mode) => {
+    const state = get();
+    const el = state.elements.find((e) => e.id === state.selectedId);
+    if (!el || el.locked) return;
+    const x = alignElementX(el, mode, state.layoutMode);
+    set((s) => applyPatch(s, el.id, { x }, true));
+  },
+
+  alignSelectedVertically: (mode) => {
+    const state = get();
+    const el = state.elements.find((e) => e.id === state.selectedId);
+    if (!el || el.locked) return;
+    const y = alignElementY(el, mode, state.layoutMode);
+    set((s) => applyPatch(s, el.id, { y }, true));
+  },
 
   setExporting: (value) =>
     set((s) => ({
@@ -160,7 +337,10 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         });
 
       const kept = state.elements.filter((e) => !overflowIds.has(e.id));
-      const merged = autoSpacing(repositionForPage([...kept, ...moved], targetPage));
+      const merged = layoutElements(
+        state,
+        repositionForPage([...kept, ...moved], targetPage)
+      );
 
       return {
         ...pushHistory(state, merged),
@@ -186,34 +366,63 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   commitElementMove: (id, x, y) => {
     get().clearAlignmentGuides();
-    set((state) => applyPatch(state, id, { x, y }, true));
+    set((state) => {
+      const clamp = (el: EditorElement) =>
+        state.snapEnabled && state.layoutMode === "flow"
+          ? snapElementToGrid(el)
+          : clampForLayoutMode(el, state.layoutMode);
+      const patched = state.elements.map((el) =>
+        el.id === id ? clamp({ ...el, x, y }) : el
+      );
+      const next =
+        state.layoutMode === "flow"
+          ? layoutElements(state, patched)
+          : patched;
+      return pushHistory(state, next);
+    });
   },
 
   resizeElement: (id, bounds) =>
     set((state) => {
-      const snap = state.snapEnabled ? snapElementToGrid : clampElement;
-      const next = autoSpacing(
-        state.elements.map((el) => (el.id === id ? snap({ ...el, ...bounds }) : el))
+      const clamp = (el: EditorElement) =>
+        state.snapEnabled && state.layoutMode === "flow"
+          ? snapElementToGrid(el)
+          : clampForLayoutMode(el, state.layoutMode);
+      const patched = state.elements.map((el) =>
+        el.id === id ? clamp({ ...el, ...bounds }) : el
       );
+      const next =
+        state.layoutMode === "flow"
+          ? layoutElements(state, patched)
+          : patched;
       return { ...pushHistory(state, next), alignmentGuides: [] };
     }),
 
-  addTextElement: () =>
+  addTextElement: (preset) =>
     set((state) => {
       const el: EditorElement = {
         id: `text-${Date.now()}`,
         type: "text",
         x: 48,
         y: 48 + state.elements.length * 32,
-        width: 300,
-        height: 28,
+        width: preset?.width ?? 300,
+        height: preset?.height ?? 28,
         zIndex: nextZIndex(state.elements),
-        text: "Click to edit",
-        fontSize: 13,
-        fill: "#18181b",
+        text: preset?.text ?? "Click to edit",
+        fontSize: preset?.fontSize ?? 13,
+        fill: preset?.fill ?? "#18181b",
+        fontFamily: preset?.fontFamily,
+        fontWeight: preset?.fontWeight,
+        fontStyle: preset?.fontStyle,
+        lineHeight: preset?.lineHeight,
+        letterSpacing: preset?.letterSpacing,
+        textAlign: preset?.textAlign,
         page: state.activePage,
       };
-      return pushHistory(state, autoSpacing([...state.elements, el]));
+      return {
+        ...pushHistory(state, layoutElements(state, [...state.elements, el])),
+        selectedId: el.id,
+      };
     }),
 
   addSectionBlock: (sectionType, defaultContent) =>
@@ -232,7 +441,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         fill: "#3f3f46",
         page: state.activePage,
       };
-      return pushHistory(state, autoSpacing([...state.elements, el]));
+      return pushHistory(state, layoutElements(state, [...state.elements, el]));
     }),
 
   addShapeElement: (shapeType = "rect") =>
@@ -253,7 +462,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         opacity: 0.9,
         page: state.activePage,
       };
-      return pushHistory(state, autoSpacing([...state.elements, el]));
+      return pushHistory(state, layoutElements(state, [...state.elements, el]));
     }),
 
   addImageElement: (src) =>
@@ -270,7 +479,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         fill: "#e4e4e7",
         page: state.activePage,
       };
-      return pushHistory(state, autoSpacing([...state.elements, el]));
+      return pushHistory(state, layoutElements(state, [...state.elements, el]));
     }),
 
   addDividerElement: () =>
@@ -286,7 +495,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         fill: "#d4d4d8",
         page: state.activePage,
       };
-      return pushHistory(state, autoSpacing([...state.elements, el]));
+      return pushHistory(state, layoutElements(state, [...state.elements, el]));
     }),
 
   duplicateElement: (id) =>
@@ -301,7 +510,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         zIndex: nextZIndex(state.elements),
       };
       return {
-        ...pushHistory(state, autoSpacing([...state.elements, copy])),
+        ...pushHistory(state, layoutElements(state, [...state.elements, copy])),
         selectedId: copy.id,
       };
     }),
@@ -333,13 +542,36 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       const fullOrder = [...ordered, ...missing];
       if (fullOrder.length === 0) return state;
 
-      let y = CANVAS_PADDING;
-      const next = fullOrder.map((el) => {
-        const repositioned = { ...el, y };
-        y += el.height + SECTION_GAP;
-        return repositioned;
+      const next =
+        state.layoutMode === "absolute"
+          ? fullOrder.map((el, index) => ({ ...el, zIndex: index + 1 }))
+          : (() => {
+              let y = CANVAS_PADDING;
+              return fullOrder.map((el) => {
+                const repositioned = { ...el, y };
+                y += el.height + SECTION_GAP;
+                return repositioned;
+              });
+            })();
+
+      return pushHistory(state, layoutElements(state, next));
+    }),
+
+  reorderLayers: (orderedIdsFrontToBack) =>
+    set((state) => {
+      const page = state.activePage;
+      const pageIds = new Set(
+        state.elements.filter((e) => (e.page ?? 1) === page).map((e) => e.id)
+      );
+      const n = orderedIdsFrontToBack.length;
+      if (n === 0) return state;
+      const next = state.elements.map((el) => {
+        if (!pageIds.has(el.id)) return el;
+        const idx = orderedIdsFrontToBack.indexOf(el.id);
+        if (idx < 0) return el;
+        return { ...el, zIndex: n - idx };
       });
-      return pushHistory(state, autoSpacing(next));
+      return pushHistory(state, next);
     }),
 
   bringForward: (id) =>
@@ -390,10 +622,14 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     set({
       elements: createDefaultCanvas().elements,
       selectedId: null,
+      editingId: null,
       past: [],
       future: [],
       isDirty: true,
       alignmentGuides: [],
+      isExporting: false,
+      activePage: 1,
+      pageCount: 1,
     }),
 
   markSaved: () => set({ isDirty: false }),
@@ -403,11 +639,11 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 }));
 
 export function getCanvasStateFromStore() {
-  const { elements, pageCount } = useEditorStore.getState();
+  const { elements, pageCount, canvasBackground } = useEditorStore.getState();
   return {
     width: 794,
     height: 1123,
-    background: "#ffffff",
+    background: canvasBackground,
     elements,
     pageCount,
   };

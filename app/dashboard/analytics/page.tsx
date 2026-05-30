@@ -25,7 +25,8 @@ interface AnalyticsData {
   totalViews: number;
   totalDownloads: number;
   totalCVs: number;
-  aiUsage: number;
+  aiUsage?: number;
+  studioUsage?: number;
   conversionRate: number;
   chartData: { name: string; views: number; downloads: number }[];
   featureUsage: { name: string; value: number }[];
@@ -87,7 +88,7 @@ export default function AnalyticsPage() {
         <StatCard label="Page views" value={data?.totalViews ?? 0} icon={Eye} />
         <StatCard label="Exports" value={data?.totalDownloads ?? 0} icon={Download} />
         <StatCard label="Total CVs" value={data?.totalCVs ?? 0} icon={FileText} />
-        <StatCard label="AI actions" value={data?.aiUsage ?? 0} icon={Sparkles} />
+        <StatCard label="Studio sessions" value={data?.studioUsage ?? data?.aiUsage ?? 0} icon={Sparkles} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -158,7 +159,7 @@ export default function AnalyticsPage() {
             <Activity className="mx-auto h-8 w-8 text-zinc-300" />
             <p className="mt-3 text-sm text-zinc-500">No activity recorded yet.</p>
             <p className="mt-1 text-xs text-zinc-400">
-              Use the builder, generator, or examples to see insights here.
+              Use Studio, templates, or examples to see insights here.
             </p>
           </div>
         ) : (

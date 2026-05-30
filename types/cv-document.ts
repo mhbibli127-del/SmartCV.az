@@ -37,8 +37,10 @@ export interface EditorElement {
   fontFamily?: string;
   fill?: string;
   fontWeight?: "normal" | "bold";
+  fontStyle?: "normal" | "italic";
   lineHeight?: number;
   letterSpacing?: number;
+  textAlign?: "left" | "center" | "right";
   sectionType?: CVSectionType;
   content?: string;
   locked?: boolean;

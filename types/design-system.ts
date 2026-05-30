@@ -1,4 +1,4 @@
-/** AI Resume OS — unified design system types */
+/** Visual CV design system types */
 
 export type AestheticStyle =
   | "minimal"
@@ -100,12 +100,4 @@ export interface DesignSuggestion {
   description: string;
   impact: "low" | "medium" | "high";
   autoFixable: boolean;
-}
-
-export interface CopilotMessage {
-  id: string;
-  role: "assistant" | "user" | "system";
-  content: string;
-  suggestions?: DesignSuggestion[];
-  timestamp: number;
 }

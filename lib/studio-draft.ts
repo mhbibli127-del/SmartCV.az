@@ -38,6 +38,18 @@ export function clearStudioDraft(): void {
   localStorage.removeItem(DRAFT_KEY);
 }
 
-export function draftMatchesSession(draft: StudioDraft, cvId: string | null): boolean {
-  return (draft.cvId ?? null) === (cvId ?? null);
+export function draftMatchesSession(
+  draft: StudioDraft,
+  cvId: string | null,
+  templateSlug?: string | null
+): boolean {
+  if ((draft.cvId ?? null) !== (cvId ?? null)) return false;
+
+  if (templateSlug) {
+    const requested = templateSlug.trim().toLowerCase();
+    const draftSlug = (draft.selectedTemplateSlug ?? "").trim().toLowerCase();
+    return draftSlug === requested;
+  }
+
+  return true;
 }

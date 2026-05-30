@@ -4,18 +4,27 @@ import { memo, useState } from "react";
 import {
   Award,
   Briefcase,
+  Circle,
   FileText,
   GraduationCap,
+  Heart,
   ImageIcon,
   Languages,
+  Layers,
   LayoutGrid,
   LayoutTemplate,
   Minus,
   Palette,
   Share2,
+  Square,
+  Star,
+  Target,
   Type,
   Upload,
   User,
+  Wrench,
+  Zap,
+  Paintbrush,
 } from "lucide-react";
 import { useEditorStore } from "@/lib/editor-store";
 import { useDesignStore } from "@/lib/design-store";
@@ -26,6 +35,11 @@ import { StudioSectionOrder } from "@/components/studio/StudioSectionOrder";
 import { StudioSectionStylePanel } from "@/components/studio/StudioSectionStylePanel";
 import { StudioTypographyPanel } from "@/components/studio/StudioTypographyPanel";
 import { StudioColorsPanel } from "@/components/studio/StudioColorsPanel";
+import { StudioLayersPanel } from "@/components/studio/StudioLayersPanel";
+import { StudioAlignControls } from "@/components/studio/StudioAlignControls";
+import { StudioBackgroundPanel } from "@/components/studio/StudioBackgroundPanel";
+import { StudioQuickToolsPanel } from "@/components/studio/StudioQuickToolsPanel";
+import { STUDIO_TEXT_PRESETS } from "@/lib/studio-text-presets";
 import { cn } from "@/lib/utils";
 
 type ContentBlock = {
@@ -47,14 +61,34 @@ const CONTENT_BLOCKS: ContentBlock[] = [
   { id: "certificates", label: "Certificates", icon: Award, description: "Certifications" },
   { id: "social", label: "Social Links", icon: Share2, description: "LinkedIn, GitHub, etc." },
   { id: "photo", label: "Profile Photo", icon: ImageIcon, description: "Avatar image" },
+  { id: "summary", label: "Summary", icon: FileText, description: "Professional summary" },
+  { id: "projects", label: "Projects", icon: Target, description: "Portfolio projects" },
+  { id: "hobbies", label: "Hobbies", icon: Heart, description: "Interests & hobbies" },
+  { id: "awards", label: "Awards", icon: Star, description: "Honors & awards" },
+  { id: "contact", label: "Contact", icon: Share2, description: "Email, phone, links" },
+  { id: "quote", label: "Quote", icon: Zap, description: "Highlight quote" },
+];
+
+const QUICK_SHAPES = [
+  { id: "shape-rect", label: "Box", icon: Square, shapeType: "rect" as const },
+  { id: "shape-circle", label: "Circle", icon: Circle, shapeType: "circle" as const },
+  { id: "shape-line", label: "Line", icon: Minus, shapeType: "line" as const },
+  { id: "header-band", label: "Header band", icon: LayoutGrid, shapeType: "rect" as const, band: true },
+  { id: "footer-band", label: "Footer band", icon: Minus, shapeType: "rect" as const, band: "footer" as const },
+  { id: "sidebar-accent", label: "Sidebar", icon: LayoutGrid, shapeType: "rect" as const, band: "sidebar" as const },
+  { id: "accent-dot", label: "Accent dot", icon: Circle, shapeType: "circle" as const, band: "dot" as const },
 ];
 
 export type StudioTool =
   | "content"
+  | "shapes"
+  | "background"
   | "templates"
   | "typography"
   | "colors"
+  | "tools"
   | "layout"
+  | "layers"
   | "uploads";
 
 const TOOLS: {
@@ -62,11 +96,15 @@ const TOOLS: {
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { id: "content", label: "Content", icon: FileText },
+  { id: "content", label: "Blocks", icon: FileText },
+  { id: "shapes", label: "Shapes", icon: Square },
+  { id: "background", label: "Background", icon: Paintbrush },
   { id: "templates", label: "Templates", icon: LayoutTemplate },
-  { id: "typography", label: "Typography", icon: Type },
+  { id: "typography", label: "Type", icon: Type },
   { id: "colors", label: "Colors", icon: Palette },
+  { id: "tools", label: "Tools", icon: Wrench },
   { id: "layout", label: "Layout", icon: LayoutGrid },
+  { id: "layers", label: "Layers", icon: Layers },
   { id: "uploads", label: "Uploads", icon: Upload },
 ];
 
@@ -96,12 +134,18 @@ function StudioToolsPanelInner({
   const addSectionBlock = useEditorStore((s) => s.addSectionBlock);
   const addDividerElement = useEditorStore((s) => s.addDividerElement);
   const addImageElement = useEditorStore((s) => s.addImageElement);
+  const addShapeElement = useEditorStore((s) => s.addShapeElement);
+  const bringForward = useEditorStore((s) => s.bringForward);
+  const sendBackward = useEditorStore((s) => s.sendBackward);
+  const selectedId = useEditorStore((s) => s.selectedId);
   const applyThemeToCanvas = useDesignStore((s) => s.applyThemeToCanvas);
   const setSpacing = useDesignStore((s) => s.setSpacing);
   const activeTheme = useDesignStore((s) => s.activeTheme);
   const selectedTemplate = useDesignStore((s) => s.selectedTemplate);
   const toggleRulers = useEditorStore((s) => s.toggleRulers);
   const showRulers = useEditorStore((s) => s.showRulers);
+  const showGrid = useEditorStore((s) => s.showGrid);
+  const toggleShowGrid = useEditorStore((s) => s.toggleShowGrid);
   const snapEnabled = useEditorStore((s) => s.snapEnabled);
   const toggleSnap = useEditorStore((s) => s.toggleSnap);
 
@@ -144,12 +188,105 @@ function StudioToolsPanelInner({
         addSectionBlock("projects", "AWS Certified Developer — 2024\nGoogle UX Design — 2023");
         break;
       case "social":
-        addTextElement();
+        addTextElement({
+          text: "LinkedIn · GitHub · Portfolio",
+          fontSize: 11,
+          fill: "#52525b",
+        });
+        break;
+      case "projects":
+        addSectionBlock(
+          "projects",
+          "E-Commerce Platform — Lead Developer\n2023 – Present\n• Scaled checkout to 50k daily users"
+        );
+        break;
+      case "hobbies":
+        addSectionBlock("skills", "Photography\nRunning\nOpen Source");
+        break;
+      case "awards":
+        addSectionBlock("projects", "Employee of the Year — 2024\nDean's List — 2020");
+        break;
+      case "contact":
+        addTextElement({
+          text: "email@example.com · +994 50 000 00 00 · Baku, AZ",
+          fontSize: 11,
+        });
+        break;
+      case "quote":
+        addTextElement({
+          text: '"Design is not just what it looks like — design is how it works."',
+          fontSize: 12,
+          fontStyle: "italic",
+          lineHeight: 1.5,
+          height: 40,
+        });
         break;
       case "photo":
         addImageElement();
         break;
+      case "summary":
+        addSectionBlock(
+          "summary",
+          "Experienced professional with a track record of delivering results. Skilled in leadership, communication, and cross-functional collaboration."
+        );
+        break;
       default:
+        if (blockId === "header-band") {
+          addShapeElement("rect");
+          const id = useEditorStore.getState().selectedId;
+          if (id) {
+            useEditorStore.getState().updateElement(id, {
+              x: 0,
+              y: 0,
+              width: 794,
+              height: 48,
+              fill: activeTheme.palette.primary,
+              opacity: 0.12,
+            });
+          }
+        } else if (blockId === "footer-band") {
+          addShapeElement("rect");
+          const id = useEditorStore.getState().selectedId;
+          if (id) {
+            useEditorStore.getState().updateElement(id, {
+              x: 0,
+              y: 1083,
+              width: 794,
+              height: 36,
+              fill: activeTheme.palette.primary,
+              opacity: 0.08,
+            });
+          }
+        } else if (blockId === "sidebar-accent") {
+          addShapeElement("rect");
+          const id = useEditorStore.getState().selectedId;
+          if (id) {
+            useEditorStore.getState().updateElement(id, {
+              x: 0,
+              y: 0,
+              width: 220,
+              height: 1123,
+              fill: activeTheme.palette.primary,
+              opacity: 0.06,
+            });
+          }
+        } else if (blockId === "accent-dot") {
+          addShapeElement("circle");
+          const id = useEditorStore.getState().selectedId;
+          if (id) {
+            useEditorStore.getState().updateElement(id, {
+              x: 48,
+              y: 48,
+              width: 64,
+              height: 64,
+              fill: activeTheme.palette.accent,
+              opacity: 0.35,
+            });
+          }
+        } else if (blockId.startsWith("shape-")) {
+          const shape = QUICK_SHAPES.find((s) => s.id === blockId);
+          if (shape) addShapeElement(shape.shapeType);
+        }
         break;
     }
   };
@@ -213,14 +350,54 @@ function StudioToolsPanelInner({
                   </button>
                 ))}
               </div>
+
+              <PanelHeading>Text presets</PanelHeading>
+              <div className="flex flex-wrap gap-1.5">
+                {STUDIO_TEXT_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    title={preset.description}
+                    onClick={() => addTextElement(preset.patch)}
+                    className="rounded-lg border border-zinc-200 px-2.5 py-1.5 text-[10px] font-medium text-zinc-700 hover:border-zinc-300 hover:bg-zinc-50"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
             </div>
           )}
+
+          {tool === "shapes" && (
+            <div className="space-y-4">
+              <PanelHeading>Shapes & decor</PanelHeading>
+              <div className="grid grid-cols-2 gap-2">
+                {QUICK_SHAPES.map((shape) => (
+                  <button
+                    key={shape.id}
+                    type="button"
+                    onClick={() => handleAddBlock(shape.id)}
+                    className="flex flex-col items-center gap-1.5 rounded-xl border border-zinc-200 p-3 text-center transition hover:border-zinc-300 hover:bg-zinc-50"
+                  >
+                    <shape.icon className="h-4 w-4 text-zinc-600" />
+                    <span className="text-[10px] font-medium text-zinc-700">{shape.label}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-zinc-400">
+                Formalar, xətlər və başlıq zolağı əlavə edin. Rəngi Colors tabından dəyişin.
+              </p>
+            </div>
+          )}
+
+          {tool === "background" && <StudioBackgroundPanel />}
 
           {tool === "templates" && (
             <div className="space-y-3">
               <PanelHeading>Switch template</PanelHeading>
               <div className="grid grid-cols-2 gap-2">
-                {EDITOR_TEMPLATES.map((tpl) => (
+                {EDITOR_TEMPLATES.map((tpl, index) => (
                   <button
                     key={tpl.id}
                     type="button"
@@ -232,7 +409,13 @@ function StudioToolsPanelInner({
                         : "border-zinc-200 hover:border-zinc-300"
                     )}
                   >
-                    <CvTemplateThumbnail template={tpl} className="rounded-none" />
+                    <CvTemplateThumbnail
+                      template={tpl}
+                      className="rounded-none"
+                      priority={
+                        index < 2 || selectedTemplate?.slug === tpl.slug
+                      }
+                    />
                     <p className="truncate px-2 py-1.5 text-[10px] font-medium text-zinc-700">
                       {tpl.name}
                     </p>
@@ -240,7 +423,7 @@ function StudioToolsPanelInner({
                 ))}
               </div>
               <p className="text-xs text-zinc-400">
-                Your content is preserved when switching templates.
+                Switching templates replaces the canvas with a fresh layout.
               </p>
             </div>
           )}
@@ -248,6 +431,8 @@ function StudioToolsPanelInner({
           {tool === "typography" && <StudioTypographyPanel />}
 
           {tool === "colors" && <StudioColorsPanel />}
+
+          {tool === "tools" && <StudioQuickToolsPanel />}
 
           {tool === "layout" && (
             <div className="space-y-4">
@@ -271,6 +456,18 @@ function StudioToolsPanelInner({
                 </button>
                 <button
                   type="button"
+                  onClick={toggleShowGrid}
+                  className={cn(
+                    "rounded-lg border px-3 py-2 text-xs font-medium",
+                    showGrid
+                      ? "border-zinc-900 bg-zinc-900 text-white"
+                      : "border-zinc-200 hover:bg-zinc-50"
+                  )}
+                >
+                  Grid
+                </button>
+                <button
+                  type="button"
                   onClick={toggleSnap}
                   className={cn(
                     "rounded-lg border px-3 py-2 text-xs font-medium",
@@ -282,6 +479,28 @@ function StudioToolsPanelInner({
                   Snap to grid
                 </button>
               </div>
+              <StudioAlignControls compact />
+              {selectedId && (
+                <>
+                  <PanelHeading>Layer order</PanelHeading>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => bringForward(selectedId)}
+                      className="flex-1 rounded-lg border border-zinc-200 py-2 text-xs font-medium hover:bg-zinc-50"
+                    >
+                      Bring forward
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => sendBackward(selectedId)}
+                      className="flex-1 rounded-lg border border-zinc-200 py-2 text-xs font-medium hover:bg-zinc-50"
+                    >
+                      Send back
+                    </button>
+                  </div>
+                </>
+              )}
               <PanelHeading>Section spacing</PanelHeading>
               <label className="block text-xs text-zinc-600">
                 <input
@@ -302,6 +521,21 @@ function StudioToolsPanelInner({
               >
                 Apply layout
               </button>
+              <PanelHeading>Keyboard shortcuts</PanelHeading>
+              <ul className="space-y-1 text-[10px] leading-relaxed text-zinc-500">
+                <li>Ctrl+Z / Ctrl+Shift+Z — Undo / Redo</li>
+                <li>Ctrl+C / Ctrl+V — Copy / Paste element</li>
+                <li>Ctrl+D — Duplicate</li>
+                <li>Ctrl+G — Toggle snap</li>
+                <li>Arrows — Move · [ ] — Layer order</li>
+              </ul>
+            </div>
+          )}
+
+          {tool === "layers" && (
+            <div className="space-y-3">
+              <PanelHeading>Canvas layers</PanelHeading>
+              <StudioLayersPanel />
             </div>
           )}
 

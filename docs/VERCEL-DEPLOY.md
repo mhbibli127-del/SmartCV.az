@@ -32,7 +32,6 @@ openssl rand -base64 32
 | Variable | Why |
 |----------|-----|
 | `CLOUDINARY_*` | PDF/thumbnail exports persist on Vercel (local `public/resumes/` is ephemeral) |
-| `OPENAI_API_KEY` | AI generator + PDF import |
 | `EMAIL_*` | OTP / verification emails |
 
 ## 4. Optional
@@ -41,9 +40,6 @@ openssl rand -base64 32
 |----------|---------|
 | `MONGODB_URI` | Legacy `/api/cv/*` + analytics (core Studio uses Prisma only) |
 | `GOOGLE_CLIENT_ID/SECRET` | Google OAuth |
-| `NEXT_PUBLIC_POSTHOG_ENABLED` | Set `true` only with a valid `phc_` project key |
-| `NEXT_PUBLIC_POSTHOG_KEY` | PostHog Project API Key (`phc_…` from Project Settings) |
-| `NEXT_PUBLIC_POSTHOG_HOST` | `https://us.i.posthog.com` or `https://eu.i.posthog.com` |
 | `SENTRY_DSN` | Server error monitoring (optional) |
 | `NEXT_PUBLIC_SENTRY_DSN` | Same DSN as above — required for browser errors |
 | `SENTRY_AUTH_TOKEN` | Source map upload at build (Production; secret) |
@@ -52,16 +48,25 @@ openssl rand -base64 32
 
 **Sentry on Vercel:** `VERCEL_GIT_COMMIT_SHA` is set automatically and used as the release name. Without `SENTRY_AUTH_TOKEN`, the app still runs but stack traces stay minified (no build warnings).
 
-## 5. Database setup
+## 5. Database setup (Supabase)
+
+| Variable | Host | Port | Notes |
+|----------|------|------|--------|
+| `DATABASE_URL` | `*.pooler.supabase.com` | **6543** | `?pgbouncer=true` — runtime + Vercel |
+| `DIRECT_URL` | `db.*.supabase.co` | **5432** | Migrations only — **not** the pooler host |
+
+Password must appear in both URLs (`postgres.REF:PASSWORD@...`). Encode `@` in passwords as `%40`.
 
 ```bash
-# One-time: apply schema to Supabase (uses DIRECT_URL)
-npx prisma migrate deploy
+npm run db:generate
+npm run db:validate
+npm run db:check          # SELECT 1 via pooler
+npm run db:migrate:deploy # applies migrations via DIRECT_URL
 ```
 
-If migrations fail, run `npx prisma db push` once in dev, then use migrations going forward.
+**Common mistakes:** missing password, `DIRECT_URL` pointing at pooler, `NODE_ENV=production` in `.env.local` during dev.
 
-**Supabase password reset:** If you see `ECIRCUITBREAKER`, reset the DB password in Supabase and update both URLs. Wait 5–15 minutes before retrying.
+**Supabase password reset:** If you see `ECIRCUITBREAKER` or `Authentication failed`, reset the DB password in Supabase, update both URLs, wait 5–15 minutes before retrying.
 
 ## 6. Local verification
 

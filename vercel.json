@@ -11,9 +11,6 @@
     },
     "app/api/resumes/publish-export/route.ts": {
       "maxDuration": 60
-    },
-    "app/api/cv/generate/route.ts": {
-      "maxDuration": 60
     }
   }
 }

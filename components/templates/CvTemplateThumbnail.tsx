@@ -1,7 +1,6 @@
 "use client";
 
 import { memo, useEffect, useState } from "react";
-import Image from "next/image";
 import type { CvEditorTemplate } from "@/types/cv-editor";
 import { cn } from "@/lib/utils";
 
@@ -50,14 +49,14 @@ function CvTemplateThumbnailInner({
           <span className="text-[10px] text-zinc-400">{template.category}</span>
         </div>
       ) : (
-        <Image
+        // eslint-disable-next-line @next/next/no-img-element -- matches studio SVG base layer
+        <img
           src={src}
           alt={`${template.name} preview`}
-          fill
-          unoptimized
-          className="object-cover object-top"
-          sizes="(max-width: 768px) 100vw, 25vw"
-          priority={priority}
+          className="absolute inset-0 h-full w-full object-cover object-top"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : "auto"}
+          decoding="async"
           onError={handleError}
         />
       )}

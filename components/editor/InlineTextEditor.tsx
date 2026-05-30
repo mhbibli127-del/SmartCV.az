@@ -19,15 +19,11 @@ function InlineTextEditorInner({ stageRef }: Props) {
   const element = elements.find((e) => e.id === editingId);
 
   useEffect(() => {
-    if (!editingId) {
-      initialValueRef.current = "";
-      return;
+    if (!editingId) return;
+    if (!elements.some((e) => e.id === editingId)) {
+      setEditingId(null);
     }
-    const el = elements.find((e) => e.id === editingId);
-    if (!el) return;
-    initialValueRef.current =
-      el.type === "section" ? el.content ?? "" : el.text ?? "";
-  }, [editingId, elements]);
+  }, [editingId, elements, setEditingId]);
 
   useEffect(() => {
     if (!editingId) {

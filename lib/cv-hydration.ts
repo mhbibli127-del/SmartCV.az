@@ -9,7 +9,7 @@ function cloneSections(sections: CVSection[]): CVSection[] {
   return JSON.parse(JSON.stringify(sections)) as CVSection[];
 }
 
-/** Convert AI generator flat payload → builder sections */
+/** Convert flat import/generator payload → builder sections */
 export function generatorDataToSections(data: Record<string, unknown>): CVSection[] {
   const sections = cloneSections(BASE_SECTIONS);
 

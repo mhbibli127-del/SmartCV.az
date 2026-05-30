@@ -55,8 +55,11 @@ export async function getUserAnalytics(email: string, range: DateRangeKey = "7d"
   const downloads = interactions.filter(
     (i) => i.action === "template_download" || i.action === "cv_export" || i.action === "cv_created"
   ).length;
-  const aiUsage = interactions.filter(
-    (i) => i.action === "ai_enhance" || i.action === "ai_generate" || i.action === "ai_optimize"
+  const studioUsage = interactions.filter(
+    (i) =>
+      i.page?.includes("studio") ||
+      i.action === "studio_open" ||
+      i.action === "cv_export"
   ).length;
 
   const dailyMap = new Map<string, { views: number; downloads: number }>();
@@ -89,10 +92,10 @@ export async function getUserAnalytics(email: string, range: DateRangeKey = "7d"
 
   const featureUsage = [
     { name: "Builder", value: interactions.filter((i) => i.page?.includes("builder")).length },
-    { name: "Generator", value: interactions.filter((i) => i.page?.includes("generator")).length },
+    { name: "Studio", value: interactions.filter((i) => i.page?.includes("studio")).length },
     { name: "Examples", value: interactions.filter((i) => i.page?.includes("examples")).length },
     { name: "Editor", value: interactions.filter((i) => i.page?.includes("editor")).length },
-    { name: "AI", value: aiUsage },
+    { name: "Templates", value: interactions.filter((i) => i.page?.includes("templates")).length },
   ].filter((f) => f.value > 0);
 
   const recentActivity = interactions.slice(0, 10).map((i) => ({
@@ -109,7 +112,8 @@ export async function getUserAnalytics(email: string, range: DateRangeKey = "7d"
     totalViews: pageViews,
     totalDownloads: downloads,
     totalCVs: cvs.length,
-    aiUsage,
+    aiUsage: studioUsage,
+    studioUsage,
     conversionRate,
     plan: saasUser?.plan ?? "free",
     cvUsed: saasUser?.cvUsed ?? cvs.length,

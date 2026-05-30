@@ -11,9 +11,12 @@ import {
 } from "@/lib/cv-editor/template-catalog";
 import type { CoreTemplateCategory } from "@/lib/design-engine/core-templates";
 import type { CvEditorTemplate } from "@/types/cv-editor";
-import { useDesignStore } from "@/lib/design-store";
 import { useAnalytics } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import { preloadImage } from "@/lib/wait-for-images";
+import { getTemplatePreviewSrc } from "@/lib/cv-editor/template-base-layer";
+import { clearEntireEditorState } from "@/lib/template-engine/reset";
+import { clearStudioDraft } from "@/lib/studio-draft";
 
 const TemplatePreviewModal = dynamic(
   () => import("@/components/templates/TemplatePreviewModal").then((m) => m.TemplatePreviewModal),
@@ -33,7 +36,6 @@ export default function TemplatesPage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CoreTemplateCategory | "All">("All");
   const [previewTemplate, setPreviewTemplate] = useState<CvEditorTemplate | null>(null);
-  const setTemplate = useDesignStore((s) => s.setTemplate);
   const { trackTemplateSelect } = useAnalytics();
 
   const filtered = useMemo(() => {
@@ -49,9 +51,12 @@ export default function TemplatesPage() {
     });
   }, [category, query]);
 
-  const openEditor = (template: CvEditorTemplate) => {
-    setTemplate(template.source);
+  const openEditor = async (template: CvEditorTemplate) => {
     trackTemplateSelect(0, template.name, template.category);
+    clearEntireEditorState();
+    clearStudioDraft();
+    await preloadImage(getTemplatePreviewSrc(template), getTemplatePreviewSrc(template));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     router.push(`/dashboard/studio?template=${encodeURIComponent(template.slug)}`);
   };
 
@@ -101,10 +106,11 @@ export default function TemplatesPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {filtered.map((template) => (
+        {filtered.map((template, index) => (
           <TemplateCard
             key={template.id}
             template={template}
+            priority={index < 4}
             onUse={() => openEditor(template)}
             onPreview={() => setPreviewTemplate(template)}
           />

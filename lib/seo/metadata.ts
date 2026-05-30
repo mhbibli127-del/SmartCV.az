@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 const SITE_NAME = "SmartCV.AZ";
 const DEFAULT_DESCRIPTION =
-  "AI-powered CV builder, resume analyzer, and career tools for Azerbaijan and beyond.";
+  "Professional CV builder with templates, visual Studio editor, and PDF export for Azerbaijan and beyond.";
 const DEFAULT_OG_IMAGE = "/brand/logo-mark.svg";
 
 type PageMetadataOptions = {

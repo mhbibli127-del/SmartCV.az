@@ -119,6 +119,14 @@ export function getClientSentryOptions(): BrowserOptions {
     return { enabled: false };
   }
 
+  // Avoid noisy /monitoring 500s during local dev (tunnel is production-only).
+  if (
+    base.environment === "development" &&
+    process.env.NEXT_PUBLIC_SENTRY_DEV !== "true"
+  ) {
+    return { enabled: false };
+  }
+
   return {
     ...base,
     enableLogs: base.environment === "development",

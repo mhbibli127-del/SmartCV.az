@@ -25,9 +25,28 @@ export async function GET(req: NextRequest) {
       /* Prisma may be misconfigured — findUserByEmail falls back to local JSON */
     }
 
-    const user = await findUserByEmail(auth.email);
+    let user = await findUserByEmail(auth.email);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      try {
+        await ensureGoogleUser({
+          email: auth.email,
+          name: auth.name,
+          image: auth.image,
+        });
+        user = await findUserByEmail(auth.email);
+      } catch (dbErr) {
+        console.error("[auth/me] user lookup/create failed", dbErr);
+      }
+    }
+
+    if (!user) {
+      // DB may be down — still allow OAuth session so login does not loop.
+      return NextResponse.json({
+        email: auth.email,
+        name: auth.name ?? null,
+        image: auth.image ?? null,
+        degraded: true,
+      });
     }
 
     if (!isUserVerified(user)) {
@@ -67,17 +86,26 @@ export async function POST(req: NextRequest) {
     }
 
     const email = auth.email.toLowerCase().trim();
-    const user = await ensureGoogleUser({
-      email,
-      name: auth.name,
-      image: auth.image,
-    });
+    let name = auth.name ?? null;
+    let image = auth.image ?? null;
+
+    try {
+      const user = await ensureGoogleUser({
+        email,
+        name: auth.name,
+        image: auth.image,
+      });
+      name = user.name ?? name;
+      image = ("image" in user ? user.image : null) ?? image;
+    } catch (dbErr) {
+      console.error("[auth/me] bridge persist failed (continuing)", dbErr);
+    }
 
     const response = NextResponse.json({
       success: true,
       email,
-      name: user.name ?? auth.name,
-      image: ("image" in user ? user.image : null) ?? auth.image ?? null,
+      name,
+      image,
     });
 
     attachSessionCookies(response, email, cookieSecureFromRequest(req));

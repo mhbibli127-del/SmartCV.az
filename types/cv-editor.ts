@@ -52,6 +52,7 @@ export interface CvEditorTemplate {
     background: string;
     text: string;
     muted: string;
+    surface?: string;
   };
   fonts: {
     heading: string;
@@ -76,12 +77,4 @@ export type LeftSidebarSection =
   | "colors"
   | "fonts"
   | "layout"
-  | "ai";
-
-export type AiEditorAction =
-  | "rewrite"
-  | "improve"
-  | "summary"
-  | "skills"
-  | "cover-letter"
-  | "grammar";
+  | "background";

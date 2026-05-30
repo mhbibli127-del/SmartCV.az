@@ -2,7 +2,6 @@ export type AccountSectionId =
   | "profile"
   | "security"
   | "notifications"
-  | "ai"
   | "privacy";
 
 export interface AccountNavItem {
@@ -23,12 +22,5 @@ export interface NotificationPrefs {
   jobAlerts: boolean;
   cvFeedback: boolean;
   marketing: boolean;
-}
-
-export interface AiPreferences {
-  cvStyle: "modern" | "minimal" | "creative";
-  tone: "formal" | "friendly" | "aggressive";
-  language: "en" | "az" | "ru";
-  autoImprove: boolean;
 }
 

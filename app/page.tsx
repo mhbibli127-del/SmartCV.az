@@ -4,7 +4,7 @@ import { createPageMetadata } from "@/lib/seo/metadata";
 
 export const metadata = createPageMetadata({
   title: "SmartCV.AZ",
-  description: "AI-powered CV builder and resume analyzer for modern job seekers.",
+  description: "Professional CV builder with templates, Studio editor, and PDF export for modern job seekers.",
   path: "/",
 });
 
@@ -211,7 +211,7 @@ export default function HomePage() {
               <div>
                 <p className="text-sm font-semibold text-gray-900">Ready to build your CV?</p>
                 <h3 className="mt-2 text-2xl font-semibold text-gray-900">
-                  Professional templates, AI tools, and PDF export
+                  Professional templates, visual Studio, and PDF export
                 </h3>
                 <p className="mt-2 text-sm text-gray-600">Free CV builder — no credit card required.</p>
               </div>

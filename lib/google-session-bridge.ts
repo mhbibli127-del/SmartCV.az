@@ -4,6 +4,12 @@ import { findUserByEmail } from "@/lib/users";
 import { signSessionToken } from "@/lib/token";
 import { setAuthStateCookie, sessionCookieOptions } from "@/lib/auth-cookie";
 import { upsertSaasUserOnAuth } from "@/lib/saas-user";
+import {
+  buildOAuthSyncCallbackUrl,
+  sanitizeAuthRedirect,
+} from "@/lib/auth-redirect-path";
+
+export { buildOAuthSyncCallbackUrl, sanitizeAuthRedirect };
 
 export const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
@@ -105,13 +111,3 @@ export function attachSessionCookies(
   return response;
 }
 
-/** Sanitize post-login redirect — blocks open redirects. */
-export function sanitizeAuthRedirect(next: string | null | undefined): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return "/dashboard";
-  }
-  if (next.startsWith("/login") || next.startsWith("/register")) {
-    return "/dashboard";
-  }
-  return next;
-}

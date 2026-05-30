@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { CvEditorShell } from "@/components/editor/cv-builder/CvEditorShell";
 import type { EditorCanvasHandle } from "@/components/editor/cv-builder/EditorCanvas";
 import { getEditorTemplate } from "@/lib/cv-editor/template-catalog";
+import { getTemplatePreviewSrc } from "@/lib/cv-editor/template-base-layer";
+import { preloadImage } from "@/lib/wait-for-images";
 import { apiCanvasToCvElements, cvElementsToApiCanvas } from "@/lib/cv-editor/serialize-canvas";
 import { captureCanvasForSave } from "@/lib/cv-editor/capture-canvas";
 import { downloadPdfFromBase64 } from "@/lib/cv-editor/download-pdf";
@@ -157,6 +159,12 @@ function EditorPageContent() {
           router.replace("/dashboard/templates");
           return;
         }
+
+        await preloadImage(
+          getTemplatePreviewSrc(template),
+          getTemplatePreviewSrc(template)
+        );
+        if (cancelled) return;
 
         resetForNewTemplate(template);
         setTitle(`${template.name} CV`);

@@ -1,6 +1,7 @@
 import type { EditorCanvasState, EditorElement } from "@/types/cv-document";
 import type { CvEditorElement } from "@/types/cv-editor";
 import { A4_HEIGHT, A4_WIDTH } from "@/lib/layout-engine";
+import { mapFontWeight } from "@/lib/cv-text-style";
 
 export function cvElementsToApiCanvas(
   elements: CvEditorElement[],
@@ -19,7 +20,7 @@ export function cvElementsToApiCanvas(
     fontSize: el.style.fontSize,
     fontFamily: el.style.fontFamily,
     fill: el.style.color,
-    fontWeight: el.style.fontWeight === 700 || el.style.fontWeight === "bold" ? "bold" : "normal",
+    fontWeight: mapFontWeight(el.style.fontWeight),
     locked: el.locked,
     src: el.src,
     opacity: el.style.opacity,

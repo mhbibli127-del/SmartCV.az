@@ -12,6 +12,11 @@ import {
   revisionFromElements,
   syncResumeIdInUrl,
 } from "@/lib/resume-save-client";
+import {
+  isResumeDbAvailable,
+  markResumeDbAvailable,
+  markResumeDbUnavailable,
+} from "@/lib/resume-db-client";
 
 const LOCAL_AUTOSAVE_MS = 2000;
 const DB_AUTOSAVE_MS = 15_000;
@@ -38,6 +43,7 @@ export function useStudioAutosave({ resumeId, title }: UseStudioAutosaveOptions)
   const backoffUntilRef = useRef(0);
   const lastSavedFingerprintRef = useRef<string | null>(null);
   const lastDbSaveAtRef = useRef(0);
+  const dbAvailableRef = useRef<boolean | null>(null);
 
   const themeKey = activeTheme.id;
   const templateKey = selectedTemplate?.slug ?? selectedTemplate?.id ?? "none";
@@ -98,6 +104,13 @@ export function useStudioAutosave({ resumeId, title }: UseStudioAutosaveOptions)
           return;
         }
 
+        if (dbAvailableRef.current === false) return;
+
+        if (dbAvailableRef.current === null) {
+          dbAvailableRef.current = await isResumeDbAvailable();
+          if (!dbAvailableRef.current) return;
+        }
+
         savingRef.current = true;
 
         const designState = useDesignStore.getState();
@@ -129,6 +142,8 @@ export function useStudioAutosave({ resumeId, title }: UseStudioAutosaveOptions)
           if (res.ok) {
             failStreakRef.current = 0;
             backoffUntilRef.current = 0;
+            markResumeDbAvailable();
+            dbAvailableRef.current = true;
             const data = await res.json();
             markSaved();
             if (data.resumeId && !resumeIdRef.current) {
@@ -141,6 +156,8 @@ export function useStudioAutosave({ resumeId, title }: UseStudioAutosaveOptions)
               resumeId: data.resumeId ?? resumeIdRef.current ?? undefined,
             });
           } else if (res.status === 503) {
+            markResumeDbUnavailable();
+            dbAvailableRef.current = false;
             failStreakRef.current += 1;
             const retrySec = Number(res.headers.get("Retry-After") ?? 60);
             const backoffMs = Math.min(

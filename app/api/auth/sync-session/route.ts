@@ -23,11 +23,16 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    await ensureGoogleUser({
-      email: auth.email,
-      name: auth.name,
-      image: auth.image,
-    });
+    try {
+      await ensureGoogleUser({
+        email: auth.email,
+        name: auth.name,
+        image: auth.image,
+      });
+    } catch (dbErr) {
+      // DB outage must not block login — JWT cookies are enough for the app session.
+      console.error("[auth/sync-session] user persist failed (continuing)", dbErr);
+    }
 
     const next = sanitizeAuthRedirect(req.nextUrl.searchParams.get("next"));
     const response = NextResponse.redirect(new URL(next, req.url));

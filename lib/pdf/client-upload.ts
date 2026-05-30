@@ -16,7 +16,7 @@ export type PdfUploadSuccess = {
 
 export type PdfUploadResult = PdfUploadSuccess | PdfUploadError;
 
-/** Upload a PDF resume for AI parsing via POST /api/upload/pdf */
+/** Upload a PDF resume for parsing via POST /api/upload/pdf */
 export async function uploadPdfForImport(file: File): Promise<PdfUploadResult> {
   const headerSlice = file.slice(0, 4);
   const headerBuffer = await headerSlice.arrayBuffer();
@@ -54,7 +54,7 @@ export async function uploadPdfForImport(file: File): Promise<PdfUploadResult> {
   return { ok: true, data };
 }
 
-/** Persist parsed CV fields for the AI generator flow. */
+/** Persist parsed CV fields for Studio import (?import=pdf). */
 export function storeExtractedPdfData(data: PdfImportPayload): void {
   try {
     localStorage.setItem("extractedPdfData", JSON.stringify(data));

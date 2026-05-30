@@ -8,10 +8,14 @@ export function useEditorKeyboardShortcuts() {
   const redo = useEditorStore((s) => s.redo);
   const removeElement = useEditorStore((s) => s.removeElement);
   const selectedId = useEditorStore((s) => s.selectedId);
+  const selectElement = useEditorStore((s) => s.selectElement);
   const updateElement = useEditorStore((s) => s.updateElement);
   const bringForward = useEditorStore((s) => s.bringForward);
   const sendBackward = useEditorStore((s) => s.sendBackward);
   const toggleSnap = useEditorStore((s) => s.toggleSnap);
+  const copyElement = useEditorStore((s) => s.copyElement);
+  const pasteElement = useEditorStore((s) => s.pasteElement);
+  const duplicateElement = useEditorStore((s) => s.duplicateElement);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -30,6 +34,25 @@ export function useEditorKeyboardShortcuts() {
       if ((mod && e.key === "z" && e.shiftKey) || (mod && e.key === "y")) {
         e.preventDefault();
         redo();
+        return;
+      }
+      if (mod && e.key === "c" && selectedId) {
+        e.preventDefault();
+        copyElement(selectedId);
+        return;
+      }
+      if (mod && e.key === "v") {
+        e.preventDefault();
+        pasteElement();
+        return;
+      }
+      if (mod && e.key === "d" && selectedId) {
+        e.preventDefault();
+        duplicateElement(selectedId);
+        return;
+      }
+      if (e.key === "Escape") {
+        selectElement(null);
         return;
       }
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
@@ -84,9 +107,13 @@ export function useEditorKeyboardShortcuts() {
     redo,
     removeElement,
     selectedId,
+    selectElement,
     updateElement,
     bringForward,
     sendBackward,
     toggleSnap,
+    copyElement,
+    pasteElement,
+    duplicateElement,
   ]);
 }

@@ -1,19 +1,20 @@
 "use client";
 
-import { memo, useCallback, useRef, forwardRef, useImperativeHandle, useEffect } from "react";
+import { memo, useCallback, useRef, forwardRef, useImperativeHandle, useEffect, useState } from "react";
 import { Stage, Layer, Rect } from "react-konva";
 import type Konva from "konva";
 import { ElementLayer } from "./ElementLayer";
 import { AlignmentGuides } from "./AlignmentGuides";
 import { SelectionTransformer } from "./SelectionTransformer";
 import { InlineTextEditor } from "./InlineTextEditor";
-import { StudioResizeOverlay } from "@/components/studio/StudioResizeOverlay";
 import { StudioElementToolbar } from "@/components/studio/StudioElementToolbar";
 import { useEditorStore } from "@/lib/editor-store";
 import { useDesignStore } from "@/lib/design-store";
 import { A4_HEIGHT, A4_WIDTH, CANVAS_PADDING, GRID_SIZE } from "@/lib/layout-engine";
+import { hasTemplateBaseLayer } from "@/lib/canvas-layout";
 import { themeToCanvasBackground } from "@/lib/design-engine/sync-engine";
 import { useEditorKeyboardShortcuts } from "./useEditorKeyboardShortcuts";
+import { ensureCanvasFontsLoaded } from "@/lib/canvas-fonts";
 
 export type CanvasEditorHandle = {
   exportPng: () => string | null;
@@ -43,9 +44,28 @@ function CanvasEditorInner(
   const clearAlignmentGuides = useEditorStore((s) => s.clearAlignmentGuides);
   const isExporting = useEditorStore((s) => s.isExporting);
   const activeTheme = useDesignStore((s) => s.activeTheme);
-  const pageFill = themeToCanvasBackground(activeTheme);
+  const hasTemplateBase = hasTemplateBaseLayer(elements);
+  const showGrid = useEditorStore((s) => s.showGrid);
+  const canvasBackground = useEditorStore((s) => s.canvasBackground);
+  const showDraftGuides = (!embedded && !hasTemplateBase) || (embedded && showGrid);
+  const pageFill = embedded
+    ? canvasBackground
+    : hasTemplateBase
+      ? "transparent"
+      : themeToCanvasBackground(activeTheme);
   const gridFill =
     activeTheme.mode === "dark" ? "rgba(255,255,255,0.04)" : "#f4f4f5";
+
+  const [pixelRatio, setPixelRatio] = useState(1);
+
+  useEffect(() => {
+    const updateRatio = () => {
+      setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    };
+    updateRatio();
+    window.addEventListener("resize", updateRatio);
+    return () => window.removeEventListener("resize", updateRatio);
+  }, []);
 
   const handleStageClick = useCallback(
     (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
@@ -80,6 +100,16 @@ function CanvasEditorInner(
           paperRef.current.offsetHeight > 0
       ),
   }));
+
+  useEffect(() => {
+    let cancelled = false;
+    void ensureCanvasFontsLoaded(elements).then(() => {
+      if (!cancelled) stageRef.current?.batchDraw();
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [elements]);
 
   useEffect(() => {
     if (!onReady) return;
@@ -125,40 +155,45 @@ function CanvasEditorInner(
           ref={stageRef}
           width={A4_WIDTH}
           height={A4_HEIGHT}
+          pixelRatio={pixelRatio}
           onClick={handleStageClick}
           onTap={handleStageClick}
         >
           <Layer listening={false}>
             <Rect width={A4_WIDTH} height={A4_HEIGHT} fill={pageFill} />
-            {Array.from({ length: Math.floor(A4_WIDTH / GRID_SIZE) }).map((_, i) => (
+            {showDraftGuides &&
+              Array.from({ length: Math.floor(A4_WIDTH / GRID_SIZE) }).map((_, i) => (
+                <Rect
+                  key={`v-${i}`}
+                  x={i * GRID_SIZE}
+                  y={0}
+                  width={1}
+                  height={A4_HEIGHT}
+                  fill={gridFill}
+                />
+              ))}
+            {showDraftGuides &&
+              Array.from({ length: Math.floor(A4_HEIGHT / GRID_SIZE) }).map((_, i) => (
+                <Rect
+                  key={`h-${i}`}
+                  x={0}
+                  y={i * GRID_SIZE}
+                  width={A4_WIDTH}
+                  height={1}
+                  fill={gridFill}
+                />
+              ))}
+            {showDraftGuides && (
               <Rect
-                key={`v-${i}`}
-                x={i * GRID_SIZE}
-                y={0}
-                width={1}
-                height={A4_HEIGHT}
-                fill={gridFill}
+                x={CANVAS_PADDING}
+                y={CANVAS_PADDING}
+                width={A4_WIDTH - CANVAS_PADDING * 2}
+                height={A4_HEIGHT - CANVAS_PADDING * 2}
+                stroke="#d4d4d8"
+                strokeWidth={1}
+                dash={[6, 6]}
               />
-            ))}
-            {Array.from({ length: Math.floor(A4_HEIGHT / GRID_SIZE) }).map((_, i) => (
-              <Rect
-                key={`h-${i}`}
-                x={0}
-                y={i * GRID_SIZE}
-                width={A4_WIDTH}
-                height={1}
-                fill={gridFill}
-              />
-            ))}
-            <Rect
-              x={CANVAS_PADDING}
-              y={CANVAS_PADDING}
-              width={A4_WIDTH - CANVAS_PADDING * 2}
-              height={A4_HEIGHT - CANVAS_PADDING * 2}
-              stroke="#d4d4d8"
-              strokeWidth={1}
-              dash={[6, 6]}
-            />
+            )}
           </Layer>
 
           <Layer ref={elementsLayerRef}>
@@ -166,24 +201,17 @@ function CanvasEditorInner(
               elements={elements}
               selectedId={selectedId}
               onSelect={selectElement}
-              disableDrag={embedded}
             />
+            <SelectionTransformer layerRef={elementsLayerRef} />
           </Layer>
 
           <Layer listening={false}>
             <AlignmentGuides />
           </Layer>
-
-          {!embedded && (
-            <Layer>
-              <SelectionTransformer layerRef={elementsLayerRef} />
-            </Layer>
-          )}
         </Stage>
         {embedded && !isExporting && (
           <div className="pointer-events-none absolute inset-0 z-10">
             <StudioElementToolbar zoom={zoom} />
-            <StudioResizeOverlay zoom={zoom} />
           </div>
         )}
         {!isExporting && <InlineTextEditor stageRef={stageRef} />}

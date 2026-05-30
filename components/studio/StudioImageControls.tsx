@@ -4,6 +4,12 @@ import { memo } from "react";
 import { useEditorStore } from "@/lib/editor-store";
 import MediaUploadDropzone from "@/components/media/MediaUploadDropzone";
 import { cn } from "@/lib/utils";
+import { useDesignStore } from "@/lib/design-store";
+import {
+  getTemplatePreviewSrc,
+  isTemplateBaseImage,
+} from "@/lib/cv-editor/template-base-layer";
+import { getEditorTemplate } from "@/lib/cv-editor/template-catalog";
 
 interface StudioImageControlsProps {
   cvId?: string | null;
@@ -19,6 +25,16 @@ function StudioImageControlsInner({ cvId, compact }: StudioImageControlsProps) {
 
   const selected = elements.find((e) => e.id === selectedId);
   const imageEl = selected?.type === "image" ? selected : null;
+  const isTemplateBase = imageEl ? isTemplateBaseImage(imageEl.id) : false;
+  const selectedTemplate = useDesignStore((s) => s.selectedTemplate);
+
+  const resetTemplateBackground = () => {
+    if (!imageEl || !isTemplateBase) return;
+    const slug = selectedTemplate?.slug;
+    const editorTpl = slug ? getEditorTemplate(slug) : null;
+    if (!editorTpl) return;
+    updateElement(imageEl.id, { src: getTemplatePreviewSrc(editorTpl) });
+  };
 
   const setShape = (shape: "square" | "rounded" | "circle") => {
     if (!imageEl) return;
@@ -83,21 +99,35 @@ function StudioImageControlsInner({ cvId, compact }: StudioImageControlsProps) {
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={() => updateElement(imageEl.id, { src: "" })}
-            className="w-full rounded-xl border border-zinc-200 py-2 text-xs font-medium hover:bg-zinc-50"
-          >
-            Remove image
-          </button>
+          {isTemplateBase && (
+            <button
+              type="button"
+              onClick={resetTemplateBackground}
+              className="w-full rounded-xl border border-zinc-200 py-2 text-xs font-medium hover:bg-zinc-50"
+            >
+              Reset template background
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => removeElement(imageEl.id)}
-            className="w-full rounded-xl border border-red-100 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
-          >
-            Delete element
-          </button>
+          {!isTemplateBase && (
+            <button
+              type="button"
+              onClick={() => updateElement(imageEl.id, { src: "" })}
+              className="w-full rounded-xl border border-zinc-200 py-2 text-xs font-medium hover:bg-zinc-50"
+            >
+              Remove image
+            </button>
+          )}
+
+          {!isTemplateBase && (
+            <button
+              type="button"
+              onClick={() => removeElement(imageEl.id)}
+              className="w-full rounded-xl border border-red-100 py-2 text-xs font-medium text-red-600 hover:bg-red-50"
+            >
+              Delete element
+            </button>
+          )}
         </>
       ) : (
         <div className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-center">

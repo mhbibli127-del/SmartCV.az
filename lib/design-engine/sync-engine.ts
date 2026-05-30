@@ -1,20 +1,27 @@
 import type { EditorElement } from "@/types/cv-document";
 import type { DesignTheme } from "@/types/design-system";
-import { autoSpacing } from "@/lib/layout-engine";
 
 /**
  * Interconnected design sync — theme changes propagate to all canvas elements.
  * Typography scale adjusts with density; colors map by element role.
+ * Layout coordinates are never mutated here — editor store handles layout pipeline.
  */
 export function applyThemeToElements(
   elements: EditorElement[],
-  theme: DesignTheme
+  theme: DesignTheme,
+  options?: { preserveTemplateColors?: boolean }
 ): EditorElement[] {
-  const { palette, fonts, spacing, density } = theme;
+  const { palette, fonts, density } = theme;
   const scale = density === "compact" ? 0.92 : density === "spacious" ? 1.08 : 1;
+  const preserveColors = options?.preserveTemplateColors ?? false;
 
-  const next = elements.map((el) => {
+  return elements.map((el) => {
     const base: EditorElement = { ...el };
+
+    if (preserveColors) {
+      if (el.fontSize) base.fontSize = Math.round(el.fontSize * scale);
+      return base;
+    }
 
     if (el.id === "heading-name" || (el.type === "text" && el.fontWeight === "bold")) {
       base.fill = palette.primary;
@@ -36,8 +43,6 @@ export function applyThemeToElements(
 
     return base;
   });
-
-  return autoSpacing(next);
 }
 
 export function themeToCanvasBackground(theme: DesignTheme): string {

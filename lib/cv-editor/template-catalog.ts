@@ -34,7 +34,9 @@ export function buildElementsFromTemplate(
 
   const elements = buildTemplateElements(slug, template.colors, template.fonts);
   const data = resumeData && Object.keys(resumeData).length ? resumeData : SAMPLE;
-  return injectDefaultImageSources(mergeResumeDataIntoElements(elements, data));
+  const merged = mergeResumeDataIntoElements(elements, data);
+  const withImages = injectDefaultImageSources(merged);
+  return withImages;
 }
 
 

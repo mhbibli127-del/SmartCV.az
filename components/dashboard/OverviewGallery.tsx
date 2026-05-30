@@ -137,11 +137,11 @@ function OverviewGalleryInner({ initialResumes, userName }: OverviewGalleryProps
     (data: PdfImportPayload) => {
       storeExtractedPdfData(data);
       if (data.success || data.fullName || data.rawExperience) {
-        success("PDF imported", "Opening AI generator with your details…");
+        success("PDF imported", "Opening Studio with your details…");
       } else {
         toastError("Partial import", data.message || "Some fields could not be read.");
       }
-      router.push("/dashboard/generator");
+      router.push("/dashboard/studio?import=pdf");
     },
     [router, success, toastError]
   );

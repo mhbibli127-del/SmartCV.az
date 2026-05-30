@@ -23,7 +23,5 @@ export const PLACEHOLDER_CONTENT = [
 export function isPlaceholderContent(value?: string): boolean {
   if (!value?.trim()) return true;
   const normalized = value.trim().toLowerCase();
-  return PLACEHOLDER_CONTENT.some((p) => normalized === p.toLowerCase())
-    || normalized.startsWith("senior developer")
-    || normalized.startsWith("javascript •");
+  return PLACEHOLDER_CONTENT.some((p) => normalized === p.toLowerCase());
 }

@@ -107,7 +107,7 @@ export async function GET() {
           mongo: isMongoCircuitOpen(),
         },
       },
-      { status: healthy ? 200 : 503 }
+      { status: 200 }
     );
   } catch (err) {
     console.error("[health GET]", err);

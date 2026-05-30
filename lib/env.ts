@@ -7,10 +7,10 @@
 
 import { isBuildPhase } from "@/lib/build";
 import {
-  getPostHogKey,
-  isPostHogConfigured,
-  isPostHogExplicitlyEnabled,
-} from "@/lib/utils/analytics/env";
+  enhancePostgresUrl,
+  isPostgresUrlConfigured,
+  validatePostgresEnv,
+} from "@/lib/database-url";
 
 function sqliteFileUrl(relativeFile: string): string {
   const normalized = relativeFile.replace(/^\.\//, "");
@@ -75,20 +75,6 @@ export function isCloudinaryConfigured(): boolean {
   );
 }
 
-export { getPostHogKey, isPostHogConfigured, isPostHogExplicitlyEnabled };
-
-export function getLeonardoApiKey(): string | null {
-  return readSecret("LEONARDO_API_KEY");
-}
-
-export function getLeonardoModelId(): string | null {
-  return readSecret("LEONARDO_MODEL_ID");
-}
-
-export function isLeonardoConfigured(): boolean {
-  return Boolean(getLeonardoApiKey());
-}
-
 export function getPineconeApiKey(): string | null {
   return readSecret("PINECONE_API_KEY");
 }
@@ -134,7 +120,26 @@ export function isPaymentConfigured(): boolean {
 
 export function getDirectUrl(): string | null {
   const raw = process.env.DIRECT_URL?.trim();
-  return raw && !isPlaceholder(raw) ? raw : null;
+  if (!raw || isPlaceholder(raw)) return null;
+  return enhancePostgresUrl(raw, "direct");
+}
+
+/** Validate Supabase pooler + direct URLs (throws with actionable message). */
+export function requirePostgresEnv(): { databaseUrl: string; directUrl: string } {
+  const databaseUrl = getDatabaseUrl();
+  const directUrl = getDirectUrl();
+  const validation = validatePostgresEnv(
+    process.env.DATABASE_URL?.trim(),
+    process.env.DIRECT_URL?.trim()
+  );
+  if (!validation.ok) {
+    const hints = validation.hints?.join(" ") ?? "";
+    throw new Error(`${validation.reason}${hints ? ` — ${hints}` : ""}`);
+  }
+  if (!directUrl) {
+    throw new Error("DIRECT_URL is required for Prisma migrations");
+  }
+  return { databaseUrl, directUrl };
 }
 
 export function getMongoUri(): string | null {
@@ -145,8 +150,16 @@ export function getMongoUri(): string | null {
   }
 }
 
-/** True when MONGODB_URI is set and looks like a valid Mongo connection string. */
+/** Set MONGODB_ENABLED=false to skip Mongo (app uses Supabase PostgreSQL). */
+export function isMongoEnabled(): boolean {
+  const flag = process.env.MONGODB_ENABLED?.trim().toLowerCase();
+  if (flag === "false" || flag === "0" || flag === "no") return false;
+  return true;
+}
+
+/** True when Mongo is enabled and MONGODB_URI is a valid connection string. */
 export function isMongoConfigured(): boolean {
+  if (!isMongoEnabled()) return false;
   const raw = process.env.MONGODB_URI?.trim();
   if (!raw || isPlaceholder(raw)) return false;
   try {
@@ -161,7 +174,7 @@ export function isMongoConfigured(): boolean {
 export function isPostgresConfigured(): boolean {
   const raw = process.env.DATABASE_URL?.trim();
   if (!raw || isPlaceholder(raw)) return false;
-  return raw.startsWith("postgresql://") || raw.startsWith("postgres://");
+  return isPostgresUrlConfigured(raw);
 }
 
 /** Redact credentials from a MongoDB URI for safe logging. */
@@ -208,10 +221,6 @@ export function requireMongoUri(): string {
   return uri;
 }
 
-export function getOpenAIKey(): string | null {
-  return readSecret("OPENAI_API_KEY");
-}
-
 /**
  * SQLite URL for Prisma. Relative `file:./dev.db` is resolved against
  * `prisma/` (Prisma convention). Rejects accidental MongoDB URIs in
@@ -221,7 +230,7 @@ export function getDatabaseUrl(): string {
   const raw = process.env.DATABASE_URL?.trim();
 
   if (raw?.startsWith("postgresql://") || raw?.startsWith("postgres://")) {
-    return raw;
+    return enhancePostgresUrl(raw, "pooler");
   }
 
   if (raw?.startsWith("mongodb")) {
@@ -341,7 +350,6 @@ const OPTIONAL_BUT_RECOMMENDED = [
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null),
   },
   { name: "MONGODB_URI", read: getMongoUri },
-  { name: "OPENAI_API_KEY", read: getOpenAIKey },
   {
     name: "GOOGLE_CLIENT_ID",
     read: () =>
@@ -353,10 +361,6 @@ const OPTIONAL_BUT_RECOMMENDED = [
   {
     name: "CLOUDINARY_CLOUD_NAME",
     read: () => (isCloudinaryConfigured() ? getCloudinaryCloudName() : null),
-  },
-  {
-    name: "NEXT_PUBLIC_POSTHOG_KEY",
-    read: getPostHogKey,
   },
   { name: "PINECONE_API_KEY", read: () => (isPineconeConfigured() ? getPineconeApiKey() : null) },
   {

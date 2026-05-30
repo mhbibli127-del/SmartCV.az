@@ -1,14 +1,6 @@
 import type { AnalyticsEventName } from "@/lib/analytics/types";
-import {
-  identifyUser as identifyPostHogUser,
-  resetUser as resetPostHogUser,
-  trackEvent,
-} from "@/lib/analytics/posthog";
 import { sanitizeAnalyticsProperties } from "@/lib/utils/analytics/sanitize";
-import {
-  isAnalyticsOptedOut,
-  isPostHogConfigured,
-} from "@/lib/utils/analytics/env";
+import { isAnalyticsOptedOut } from "@/lib/utils/analytics/env";
 import { enqueueLegacyAnalyticsEvent } from "@/lib/analytics/legacy-queue";
 
 const LEGACY_EVENT_MAP: Partial<Record<AnalyticsEventName, string>> = {
@@ -41,16 +33,8 @@ async function persistLegacyEvent(
   }
 }
 
-function capturePostHog(
-  event: AnalyticsEventName | string,
-  properties: Record<string, unknown>
-): void {
-  if (!isPostHogConfigured() || isAnalyticsOptedOut()) return;
-  trackEvent(event, sanitizeAnalyticsProperties(properties));
-}
-
 /**
- * Unified capture — PostHog (primary) + legacy MongoDB dashboard (secondary).
+ * Unified capture — legacy MongoDB dashboard analytics (client-side queue).
  */
 export async function captureAnalyticsEvent(
   event: AnalyticsEventName | string,
@@ -67,11 +51,27 @@ export async function captureAnalyticsEvent(
     referrer: document.referrer || undefined,
   };
 
-  capturePostHog(event, enriched);
-
   const legacyType =
     LEGACY_EVENT_MAP[event as AnalyticsEventName] ?? event;
-  enqueueLegacyAnalyticsEvent(legacyType, enriched, persistLegacyEvent);
+  enqueueLegacyAnalyticsEvent(
+    legacyType,
+    sanitizeAnalyticsProperties(enriched),
+    persistLegacyEvent
+  );
+}
+
+export function trackEvent(
+  event: AnalyticsEventName | string,
+  properties: Record<string, unknown> = {}
+): void {
+  void captureAnalyticsEvent(event, properties);
+}
+
+export function trackButtonClicked(
+  buttonName: string,
+  properties: Record<string, unknown> = {}
+): void {
+  trackEvent("button_clicked", { buttonName, ...properties });
 }
 
 export class AnalyticsTracker {
@@ -90,15 +90,10 @@ export class AnalyticsTracker {
 
   setUserId(userId: string): void {
     this.userId = userId;
-    if (isPostHogConfigured() && !isAnalyticsOptedOut()) {
-      identifyPostHogUser(userId, { $email: userId });
-    }
   }
 
   resetUser(): void {
     this.userId = null;
-    if (!isPostHogConfigured()) return;
-    resetPostHogUser();
   }
 
   private withUser(data: Record<string, unknown> = {}): Record<string, unknown> {

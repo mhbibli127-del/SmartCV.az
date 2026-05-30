@@ -1,6 +1,6 @@
 import { Pinecone } from "@pinecone-database/pinecone";
 import { getPineconeApiKey, getPineconeIndex, isPineconeConfigured } from "@/lib/env";
-import { EMBEDDING_DIM } from "@/lib/enterprise/ai/embeddings";
+const EMBEDDING_DIM = 1536;
 
 let client: Pinecone | null = null;
 

@@ -1,17 +1,13 @@
 /**
- * Primary analytics entry — PostHog helpers + backward-compatible exports.
+ * Primary analytics entry — legacy dashboard analytics + React hook.
  */
-export {
-  trackEvent,
-  identifyUser,
-  resetUser,
-  trackButtonClicked,
-  initPostHog,
-  getPostHogInstance,
-} from "@/lib/analytics/posthog";
-
 export { useAnalytics } from "@/hooks/useAnalytics";
-export { AnalyticsTracker, captureAnalyticsEvent } from "@/lib/analytics/tracker";
+export {
+  AnalyticsTracker,
+  captureAnalyticsEvent,
+  trackEvent,
+  trackButtonClicked,
+} from "@/lib/analytics/tracker";
 export { captureServerEvent, captureAIUsageServer } from "@/lib/analytics/server";
 export {
   trackResumeGenerated,

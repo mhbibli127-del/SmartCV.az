@@ -93,7 +93,11 @@ const sentryBuildOptions = {
   silent: !uploadSourceMaps,
   widenClientFileUpload: uploadSourceMaps,
   hideSourceMaps: true,
-  tunnelRoute: "/monitoring",
+  // Tunnel only in production — local dev proxy often fails (POST /monitoring 500)
+  tunnelRoute:
+    process.env.NODE_ENV === "production" && process.env.SENTRY_DSN?.trim()
+      ? "/monitoring"
+      : undefined,
   ...(uploadSourceMaps
     ? {
         sourcemaps: {

@@ -10,9 +10,10 @@ import {
   isMongoCircuitOpen,
   isPrismaCircuitOpen,
   recordPrismaFailure,
+  resetPrismaCircuit,
   validatePostgresUrl,
 } from "@/lib/db-circuit";
-import { getDatabaseUrl, isMongoConfigured } from "@/lib/env";
+import { getDatabaseUrl, isMongoConfigured, isMongoEnabled } from "@/lib/env";
 
 export type DbHealthStatus = {
   postgres: "ok" | "circuit_open" | "misconfigured" | "error" | "not_configured";
@@ -38,6 +39,7 @@ export async function checkPostgresHealth(): Promise<{
   const start = Date.now();
   try {
     await prisma.$queryRaw`SELECT 1`;
+    resetPrismaCircuit();
     return { status: "ok", latencyMs: Date.now() - start };
   } catch (err) {
     recordPrismaFailure(err);
@@ -51,7 +53,7 @@ export async function checkMongoHealth(): Promise<{
   latencyMs?: number;
   error?: string;
 }> {
-  if (!isMongoConfigured()) {
+  if (!isMongoEnabled() || !isMongoConfigured()) {
     return { status: "not_configured" };
   }
   if (isMongoCircuitOpen()) {

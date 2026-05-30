@@ -116,7 +116,7 @@ function SectionBlockChromeInner({ element, isSelected, width, height }: Props) 
     <Rect
       width={width}
       height={height}
-      fill="#fafafa"
+      fill={element.fill ?? "#fafafa"}
       stroke={stroke}
       strokeWidth={isSelected ? 1.5 : 1}
       cornerRadius={8}
