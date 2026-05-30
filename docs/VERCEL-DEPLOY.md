@@ -120,7 +120,26 @@ Or push to the connected production branch.
 |---------|-----|
 | Build fails `prisma generate` | Ensure `installCommand` includes devDependencies |
 | 503 on save | Fix `DATABASE_URL`, wait for circuit breaker cooldown |
-| OAuth redirect mismatch | Match `NEXTAUTH_URL` exactly to browser URL |
+| OAuth `redirect_uri_mismatch` | See **Google OAuth (Vercel)** below |
+
+## Google OAuth (Vercel)
+
+`Error 400: redirect_uri_mismatch` means Google Console does not list the exact callback URL NextAuth sends.
+
+1. Open your live site in the browser and copy the origin only, e.g. `https://smart-cv-az.vercel.app` (no trailing `/`).
+2. **Vercel → Project → Settings → Environment Variables** (Production):
+   - `NEXTAUTH_URL` = that origin (must be `https://`, not `http://localhost:3000`)
+   - `NEXT_PUBLIC_APP_URL` = same value
+   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` = same OAuth client as local dev
+3. **Google Cloud Console** → APIs & Services → Credentials → your OAuth 2.0 Client:
+   - **Authorized JavaScript origins:** `https://smart-cv-az.vercel.app`
+   - **Authorized redirect URIs:** `https://smart-cv-az.vercel.app/api/auth/callback/google`
+   - Keep localhost entries for local dev:
+     - `http://localhost:3000`
+     - `http://localhost:3000/api/auth/callback/google`
+4. If you use a **custom domain**, add **both** `*.vercel.app` and `https://yourdomain.com` (+ matching callback URLs).
+5. **Redeploy** after changing env vars.
+6. Verify: open `https://your-app.vercel.app/api/auth/config` — `callbackUrl` must match the redirect URI in Google Console **character for character**.
 | Empty export URLs | Set Cloudinary env vars and redeploy |
 | White screen | Check Vercel function logs + Sentry |
 

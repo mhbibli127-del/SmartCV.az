@@ -311,6 +311,16 @@ export function getNextAuthSecret(): string {
   return DEV_JWT_FALLBACK;
 }
 
+function isLocalhostUrl(url: string | undefined): boolean {
+  if (!url) return true;
+  try {
+    const host = new URL(url.replace(/\/$/, "")).hostname;
+    return host === "localhost" || host === "127.0.0.1";
+  } catch {
+    return true;
+  }
+}
+
 export function getNextAuthUrl(): string {
   const fallback = "http://localhost:3000";
 
@@ -320,12 +330,18 @@ export function getNextAuthUrl(): string {
     return fallback;
   }
 
-  return (
-    process.env.NEXTAUTH_URL?.trim() ||
-    process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
-    fallback
-  );
+  const vercelUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`
+    : null;
+  const nextAuth = process.env.NEXTAUTH_URL?.trim().replace(/\/$/, "");
+  const publicUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
+
+  // On Vercel, a leftover localhost NEXTAUTH_URL causes redirect_uri_mismatch.
+  if (nextAuth && !isLocalhostUrl(nextAuth)) return nextAuth;
+  if (publicUrl && !isLocalhostUrl(publicUrl)) return publicUrl;
+  if (vercelUrl) return vercelUrl;
+
+  return fallback;
 }
 
 export interface EnvReport {

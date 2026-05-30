@@ -76,6 +76,20 @@ for (const name of RECOMMENDED) {
   console.log(`  ${isSet(name) ? "OK      " : "MISSING "}${name}`);
 }
 
+const nextAuthUrl = process.env.NEXTAUTH_URL?.trim();
+if (
+  nextAuthUrl &&
+  /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(nextAuthUrl)
+) {
+  console.log(
+    "\n  WARN     NEXTAUTH_URL is localhost — on Vercel set it to https://your-app.vercel.app (fixes redirect_uri_mismatch)"
+  );
+}
+if (isSet("GOOGLE_CLIENT_ID") && isSet("NEXTAUTH_URL")) {
+  const base = nextAuthUrl?.replace(/\/$/, "");
+  console.log(`\n  Google redirect URI to register:\n    ${base}/api/auth/callback/google`);
+}
+
 if (!isSet("CLOUDINARY_CLOUD_NAME")) {
   console.log(
     "\n  NOTE: Without Cloudinary, PDF/thumbnail URLs will not persist on Vercel serverless."
