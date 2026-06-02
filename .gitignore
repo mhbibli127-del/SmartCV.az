@@ -14,6 +14,9 @@ dist
 .cache
 coverage
 tsconfig.tsbuildinfo
+prisma/dev.db
+data/*.json
+!.data/.gitkeep
 
 # Sentry Config File
 .env.sentry-build-plugin

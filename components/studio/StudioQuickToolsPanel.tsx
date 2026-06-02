@@ -9,11 +9,16 @@ import {
   Copy,
   Clipboard,
   ClipboardPaste,
+  Lock,
+  LockOpen,
   RotateCcw,
   Trash2,
-  ZoomIn,
+  AlignHorizontalJustifyCenter,
+  AlignVerticalJustifyCenter,
 } from "lucide-react";
 import { useEditorStore } from "@/lib/editor-store";
+import { A4_WIDTH, A4_HEIGHT } from "@/lib/layout-engine";
+import { useOptionalLanguage } from "@/components/i18n/LanguageProvider";
 import { cn } from "@/lib/utils";
 
 const NUDGE = 4;
@@ -46,6 +51,8 @@ function ToolBtn({
 }
 
 function StudioQuickToolsPanelInner() {
+  const lang = useOptionalLanguage();
+  const t = lang?.t ?? ((k: string) => k);
   const selectedId = useEditorStore((s) => s.selectedId);
   const elements = useEditorStore((s) => s.elements);
   const updateElement = useEditorStore((s) => s.updateElement);
@@ -55,21 +62,37 @@ function StudioQuickToolsPanelInner() {
   const pasteElement = useEditorStore((s) => s.pasteElement);
   const bringForward = useEditorStore((s) => s.bringForward);
   const sendBackward = useEditorStore((s) => s.sendBackward);
+  const toggleElementLock = useEditorStore((s) => s.toggleElementLock);
   const undo = useEditorStore((s) => s.undo);
   const redo = useEditorStore((s) => s.redo);
   const canUndo = useEditorStore((s) => s.canUndo);
   const canRedo = useEditorStore((s) => s.canRedo);
 
   const selected = elements.find((e) => e.id === selectedId);
+  const opacity =
+    selected && "opacity" in selected && typeof selected.opacity === "number"
+      ? selected.opacity
+      : 1;
 
   const nudge = (dx: number, dy: number) => {
     if (!selected || selected.locked) return;
     updateElement(selected.id, { x: selected.x + dx, y: selected.y + dy });
   };
 
+  const centerOnPage = (axis: "x" | "y") => {
+    if (!selected || selected.locked) return;
+    const w = "width" in selected ? Number(selected.width) || 0 : 0;
+    const h = "height" in selected ? Number(selected.height) || 0 : 0;
+    if (axis === "x") {
+      updateElement(selected.id, { x: Math.round((A4_WIDTH - w) / 2) });
+    } else {
+      updateElement(selected.id, { y: Math.round((A4_HEIGHT - h) / 2) });
+    }
+  };
+
   return (
     <div className="space-y-4">
-      <p className="text-xs text-zinc-500">Sürətli əməliyyatlar — seçilmiş element üçün.</p>
+      <p className="text-xs text-zinc-500">{t("studio.quickTools")}</p>
 
       <div className="grid grid-cols-3 gap-2">
         <ToolBtn title="Undo" onClick={undo} disabled={!canUndo()}>
@@ -127,6 +150,60 @@ function StudioQuickToolsPanelInner() {
           <ArrowRight className="h-4 w-4" />
         </ToolBtn>
       </div>
+
+      <p className="text-[11px] font-semibold uppercase text-zinc-400">Transform</p>
+      <div className="grid grid-cols-2 gap-2">
+        <ToolBtn
+          title={selected?.locked ? t("studio.unlock") : t("studio.lock")}
+          onClick={() => selectedId && toggleElementLock(selectedId)}
+          disabled={!selectedId}
+        >
+          {selected?.locked ? (
+            <LockOpen className="h-4 w-4" />
+          ) : (
+            <Lock className="h-4 w-4" />
+          )}
+          {selected?.locked ? t("studio.unlock") : t("studio.lock")}
+        </ToolBtn>
+        <ToolBtn
+          title={t("studio.centerH")}
+          onClick={() => centerOnPage("x")}
+          disabled={!selected}
+        >
+          <AlignHorizontalJustifyCenter className="h-4 w-4" />
+          {t("studio.centerH")}
+        </ToolBtn>
+        <ToolBtn
+          title={t("studio.centerV")}
+          onClick={() => centerOnPage("y")}
+          disabled={!selected}
+        >
+          <AlignVerticalJustifyCenter className="h-4 w-4" />
+          {t("studio.centerV")}
+        </ToolBtn>
+      </div>
+
+      {selected && "opacity" in selected && (
+        <div>
+          <label className="text-[11px] font-semibold uppercase text-zinc-400">
+            {t("studio.opacity")} ({Math.round(opacity * 100)}%)
+          </label>
+          <input
+            type="range"
+            min={0.1}
+            max={1}
+            step={0.05}
+            value={opacity}
+            disabled={selected.locked}
+            onChange={(e) =>
+              updateElement(selected.id, {
+                opacity: parseFloat(e.target.value),
+              })
+            }
+            className="mt-2 w-full accent-zinc-900"
+          />
+        </div>
+      )}
 
       <p className="text-[11px] font-semibold uppercase text-zinc-400">Layer</p>
       <div className="flex gap-2">

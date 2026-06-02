@@ -8,14 +8,13 @@ import {
   shouldBypassAuthenticatedRedirect,
 } from "@/lib/auth-middleware";
 import { sanitizeAuthRedirect } from "@/lib/auth-redirect-path";
-const AUTH_COMPLETION_PATHS = ["/verify-otp", "/register/otp"];
+const AUTH_COMPLETION_PATHS = ["/verify-otp"];
 
 function isAuthPath(pathname: string): boolean {
   return (
     pathname === "/login" ||
     pathname === "/register" ||
-    pathname === "/verify-otp" ||
-    pathname.startsWith("/register/")
+    pathname === "/verify-otp"
   );
 }
 

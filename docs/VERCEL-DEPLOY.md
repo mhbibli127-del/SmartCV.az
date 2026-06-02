@@ -145,4 +145,16 @@ Or push to the connected production branch.
 
 ---
 
+## Google Search Console (HTML file)
+
+- File: `public/google750ae19981486b4c.html`
+- Backup route: `app/google750ae19981486b4c.html/route.ts`
+- Must return **200** at `https://YOUR-DEPLOYMENT/google750ae19981486b4c.html`
+
+If you get **404** but the file exists in git: the domain may point to a **different Vercel project**
+(e.g. `smartcv.vercel.app` vs `smart-cv-az.vercel.app`). In Vercel → Project (SmartCV) → Settings → Domains,
+add `smartcv.vercel.app` to **this** repo’s deployment, then redeploy.
+
+---
+
 Copy variables from `.env.example` as a template. Never commit `.env.local`.

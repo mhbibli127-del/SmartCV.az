@@ -40,6 +40,13 @@ const nextConfig = {
   async headers() {
     return [
       {
+        source: "/google750ae19981486b4c.html",
+        headers: [
+          { key: "Content-Type", value: "text/plain; charset=utf-8" },
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: [
           { key: "X-Frame-Options", value: "DENY" },

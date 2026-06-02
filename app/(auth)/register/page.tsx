@@ -12,9 +12,14 @@ import { InputFieldIcon } from "@/components/auth/AuthFormIcons";
 import { Icon } from "@/components/ui/icon";
 import GoogleSignInButton from "@/components/auth/GoogleSignInButton";
 import OrDivider from "@/components/auth/OrDivider";
-
+import PasswordFieldHints from "@/components/auth/PasswordFieldHints";
+import { validateRegisterForm } from "@/lib/auth-validation";
+import { useAuthFieldErrors } from "@/components/auth/useAuthFieldErrors";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 export default function RegisterPage() {
   const router = useRouter();
+  const { t } = useLanguage();
+  const { fieldErrors, applyIssues, clearField, clearAll, messageFor } = useAuthFieldErrors();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,53 +32,78 @@ export default function RegisterPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
+    clearAll();
 
     if (!agreeTerms) {
-      setError("İstifadə şərtləri ilə razılaşmalısınız.");
+      setError(t("auth.terms_required"));
       return;
     }
 
-    if (password !== confirmPassword) {
-      setError("Parollar uyğun deyil.");
+    const issues = validateRegisterForm({ name, email, password, confirmPassword });
+    if (!applyIssues(issues)) {
+      toast({
+        title: t("auth.createAccount"),
+        description: issues[0] ? messageFor(issues[0]) : t("auth.password_mismatch"),
+        variant: "error",
+      });
       return;
     }
 
     setIsLoading(true);
     try {
       const cleanEmail = email.toLowerCase().trim();
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email: cleanEmail, password }),
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          email: cleanEmail,
+          password,
+          confirmPassword,
+        }),
       });
       const result = await response.json();
 
       if (!response.ok) {
-        setError(result.error || 'Qeydiyyat alınmadı');
-        toast({ title: "Qeydiyyat xətası", description: result.error || "Qeydiyyatı tamamla" });
+        setError(result.error || t("auth.password_mismatch"));
+        toast({
+          title: t("auth.createAccount"),
+          description: result.error || "Error",
+          variant: "error",
+        });
         return;
       }
 
-      localStorage.setItem('pending_otp_email', cleanEmail);
+      localStorage.setItem("pending_otp_email", cleanEmail);
+      const devHint = result.devCode
+        ? ` Dev kod: ${result.devCode}`
+        : "";
       toast({
-        title: "Qeydiyyat uğurlu",
+        title: t("auth.createAccount"),
         description:
           result.otpDelivery === "failed"
-            ? "Hesab yaradıldı. OTP göndərilmədi — 'Yenidən göndər' düyməsindən istifadə edin."
-            : "OTP göndərildi. Kodu daxil edin.",
+            ? t("auth.otp_failed") + devHint
+            : t("auth.otp_sent") + devHint,
       });
-      router.push(result.redirect || '/verify-otp?email=' + encodeURIComponent(cleanEmail));
-    } catch (err) {
-      setError("Qeydiyyat zamanı xəta baş verdi.");
-      toast({ title: "Qeydiyyat alınmadı", description: "Xahiş edirik yenidən cəhd edin." });
+      router.push(result.redirect || `/verify-otp?email=${encodeURIComponent(cleanEmail)}`);
+    } catch {
+      setError(t("auth.password_mismatch"));
+      toast({ title: t("auth.createAccount"), description: "Error", variant: "error" });
     } finally {
       setIsLoading(false);
     }
   };
 
+  const inputClass = (field: keyof typeof fieldErrors) =>
+    `w-full pl-12 py-3.5 border rounded-xl text-base focus:outline-none focus:ring-2 transition ${
+      fieldErrors[field]
+        ? "border-red-400 focus:ring-red-200"
+        : "border-gray-300 focus:ring-gray-300"
+    }`;
+
   return (
-    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center px-6">
+    <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center px-6 py-8">
       <div className="w-full max-w-6xl grid md:grid-cols-2 gap-16 items-center">
         <motion.div
           initial={{ opacity: 0, x: -40 }}
@@ -82,18 +112,11 @@ export default function RegisterPage() {
           className="space-y-8"
         >
           <h1 className="text-5xl md:text-6xl font-semibold leading-tight tracking-tight">
-            Yeni hesab yarat <br />
-            və <span className="text-gray-400">CV-ni təkmilləşdir.</span>
+            {t("auth.registerTitle1")} <br />
+            <span className="text-gray-400">{t("auth.registerTitle2")}</span>
           </h1>
-
-          <p className="text-lg text-gray-600 max-w-md">
-            Peşəkar şablonlar və Studio redaktoru ilə CV-nizi işə uyğun formata gətirin —
-            ATS layout və PDF ixracı bir yerdə.
-          </p>
-
-          <AuthFeatureList
-            items={["Sürətli qeydiyyat", "ATS layout", "PDF ixrac"]}
-          />
+          <p className="text-lg text-gray-600 max-w-md">{t("auth.registerSub")}</p>
+          <AuthFeatureList items={[t("nav.getStarted"), "ATS", "PDF"]} />
         </motion.div>
 
         <motion.div
@@ -106,66 +129,92 @@ export default function RegisterPage() {
             <div className="flex justify-center mb-4">
               <BrandLogo variant="full" size="sm" />
             </div>
-            <h2 className="text-2xl font-semibold mb-2 text-center">Hesab Yarat</h2>
-            <p className="text-sm text-gray-500 mb-6 text-center">SmartCV.az-da qeydiyyatdan keçin</p>
+            <h2 className="text-2xl font-semibold mb-2 text-center">{t("auth.createAccount")}</h2>
+            <p className="text-sm text-gray-500 mb-6 text-center">{t("auth.registerForm")}</p>
 
             {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4 text-center border border-red-100"
-              >
+              <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg mb-4 text-center border border-red-100">
                 {error}
-              </motion.div>
+              </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="relative">
-                <InputFieldIcon icon={User} />
-                <input
-                  type="text"
-                  required
-                  placeholder="Ad və Soyad"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-12 py-3.5 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                />
+              <div>
+                <div className="relative">
+                  <InputFieldIcon icon={User} />
+                  <input
+                    type="text"
+                    placeholder={t("auth.fullName")}
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      clearField("name");
+                    }}
+                    className={inputClass("name")}
+                  />
+                </div>
+                {fieldErrors.name && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
+                )}
               </div>
 
-              <div className="relative">
-                <InputFieldIcon icon={Mail} />
-                <input
-                  type="email"
-                  required
-                  placeholder="Email ünvanı"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-12 py-3.5 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                />
+              <div>
+                <div className="relative">
+                  <InputFieldIcon icon={Mail} />
+                  <input
+                    type="email"
+                    placeholder={t("auth.email")}
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      clearField("email");
+                    }}
+                    className={inputClass("email")}
+                  />
+                </div>
+                {fieldErrors.email && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>
+                )}
               </div>
 
-              <div className="relative">
-                <InputFieldIcon icon={Lock} />
-                <input
-                  type="password"
-                  required
-                  placeholder="Parol"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 py-3.5 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                />
+              <div>
+                <div className="relative">
+                  <InputFieldIcon icon={Lock} />
+                  <input
+                    type="password"
+                    placeholder={t("auth.password")}
+                    value={password}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      clearField("password");
+                    }}
+                    className={inputClass("password")}
+                  />
+                </div>
+                {fieldErrors.password && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
+                )}
+                <PasswordFieldHints password={password} className="mt-2" />
+                <p className="mt-1 text-[11px] text-gray-400">{t("auth.passwordHint")}</p>
               </div>
 
-              <div className="relative">
-                <InputFieldIcon icon={Lock} />
-                <input
-                  type="password"
-                  required
-                  placeholder="Parolu təsdiqlə"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-12 py-3.5 border border-gray-300 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-gray-300 transition"
-                />
+              <div>
+                <div className="relative">
+                  <InputFieldIcon icon={Lock} />
+                  <input
+                    type="password"
+                    placeholder={t("auth.confirmPassword")}
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      clearField("confirmPassword");
+                    }}
+                    className={inputClass("confirmPassword")}
+                  />
+                </div>
+                {fieldErrors.confirmPassword && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.confirmPassword}</p>
+                )}
               </div>
 
               <div className="flex items-center gap-2 px-1 py-1">
@@ -176,29 +225,28 @@ export default function RegisterPage() {
                   onChange={(e) => setAgreeTerms(e.target.checked)}
                   className="w-4 h-4 text-black border-gray-300 rounded focus:ring-gray-500"
                 />
-                <label htmlFor="agreeTerms" className="text-sm text-gray-500 cursor-pointer select-none">
-                  <span className="hover:underline text-gray-700 font-medium">İstifadə şərtləri</span> ilə razıyam.
+                <label htmlFor="agreeTerms" className="text-sm text-gray-500 cursor-pointer">
+                  {t("auth.agreeTerms")}
                 </label>
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full bg-black text-white py-3.5 rounded-xl text-base font-medium flex items-center justify-center gap-2 hover:bg-gray-900 transition disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full bg-black text-white py-3.5 rounded-xl text-base font-medium flex items-center justify-center gap-2 hover:bg-gray-900 transition disabled:opacity-70"
               >
-                {isLoading ? "Creating account…" : "Create account"}
+                {isLoading ? t("auth.creating") : t("auth.createAccount")}
                 <Icon icon={ArrowRight} size="sm" />
               </button>
             </form>
 
             <OrDivider />
-
             <GoogleSignInButton callbackUrl="/dashboard" />
 
             <p className="text-sm text-gray-500 mt-6 text-center">
-              Artıq hesabın var?{" "}
+              {t("auth.haveAccount")}{" "}
               <Link href="/login" className="text-black font-medium hover:underline">
-                Daxil ol
+                {t("auth.signIn")}
               </Link>
             </p>
           </div>

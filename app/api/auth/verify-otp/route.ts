@@ -1,46 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseJsonBody } from "@/lib/safe-route";
-import { getLocalDb, saveLocalDb } from "@/lib/db";
-import { setUserVerified } from "@/lib/users";
 import { signSessionToken } from "@/lib/token";
+import { verifyAndConsumeOtp } from "@/lib/otp-store";
 import {
   cookieSecureFromRequest,
   setAuthStateCookie,
   sessionCookieOptions,
 } from "@/lib/auth-cookie";
+import { validateEmail, AUTH_LIMITS, authIssueToMessage } from "@/lib/auth-validation";
 
-const VERIFIED_SESSION_MAX_AGE = 7 * 24 * 60 * 60;
+export const dynamic = "force-dynamic";
+
+const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 
 export async function POST(request: NextRequest) {
   try {
-    const secure = cookieSecureFromRequest(request);
-    const { email: rawEmail, otp } = await parseJsonBody(request);
-    const email = String(rawEmail ?? "")
+    const body = (await request.json().catch(() => ({}))) as {
+      email?: string;
+      otp?: string;
+    };
+    const email = String(body.email ?? "")
       .trim()
       .toLowerCase();
 
-    if (!email || !otp) {
-      return NextResponse.json({ error: "Email and OTP are required" }, { status: 400 });
+    const emailIssue = validateEmail(email);
+    if (emailIssue) {
+      return NextResponse.json(
+        { error: authIssueToMessage(emailIssue) },
+        { status: 400 }
+      );
     }
 
-    const otps = getLocalDb();
-    const record = otps.find(
-      (o) => o.email.toLowerCase() === email && o.code === String(otp).trim()
-    );
-
-    if (!record) {
-      return NextResponse.json({ error: "Invalid OTP code" }, { status: 400 });
+    if (!body.otp || String(body.otp).trim().length !== AUTH_LIMITS.otpLength) {
+      return NextResponse.json(
+        { error: "6 rəqəmli kodu tam daxil edin." },
+        { status: 400 }
+      );
     }
 
-    if (new Date(record.expiresAt) < new Date()) {
-      return NextResponse.json({ error: "OTP has expired" }, { status: 400 });
+    const valid = await verifyAndConsumeOtp(email, String(body.otp).trim());
+    if (!valid) {
+      return NextResponse.json(
+        { error: "Kod səhvdir və ya vaxtı keçib. Yenidən göndərin." },
+        { status: 400 }
+      );
     }
-
-    await setUserVerified(email);
-    saveLocalDb(otps.filter((o) => o.email.toLowerCase() !== email));
 
     const token = signSessionToken({ email, verified: true });
-
+    const secure = cookieSecureFromRequest(request);
     const response = NextResponse.json({
       success: true,
       redirect: "/dashboard",
@@ -49,9 +55,9 @@ export async function POST(request: NextRequest) {
     response.cookies.set(
       "token",
       token,
-      sessionCookieOptions(secure, VERIFIED_SESSION_MAX_AGE)
+      sessionCookieOptions(secure, SESSION_MAX_AGE)
     );
-    setAuthStateCookie(response, VERIFIED_SESSION_MAX_AGE, secure);
+    setAuthStateCookie(response, SESSION_MAX_AGE, secure);
 
     return response;
   } catch (error: unknown) {

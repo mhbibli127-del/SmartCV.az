@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { verifySessionToken } from "@/lib/token";
 import { generateOTP } from "@/lib/otp";
-import { getLocalDb, saveLocalDb } from "@/lib/db";
+import { saveOtp } from "@/lib/otp-store";
 import { sendOtpEmail } from "@/lib/email";
+import { validateEmail, authIssueToMessage } from "@/lib/auth-validation";
 
 export async function POST(request: Request) {
   try {
@@ -16,26 +17,31 @@ export async function POST(request: Request) {
       .trim()
       .toLowerCase();
 
-    if (!email) {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    const emailIssue = validateEmail(email);
+    if (emailIssue) {
+      return NextResponse.json(
+        { error: authIssueToMessage(emailIssue) },
+        { status: 400 }
+      );
     }
 
     const code = generateOTP();
-    const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
-
-    const otps = getLocalDb();
-    const filtered = otps.filter((o) => o.email.toLowerCase() !== email);
-    saveLocalDb([...filtered, { email, code, expiresAt }]);
+    await saveOtp(email, code);
 
     const delivery = await sendOtpEmail(email, code);
+    const isDev = process.env.NODE_ENV === "development";
 
     return NextResponse.json({
       success: true,
       message: "OTP sent successfully",
       devMode: delivery.method === "console",
+      ...(isDev && delivery.method === "console" ? { devCode: code } : {}),
     });
   } catch (error: unknown) {
     console.error("[send-otp]", error);
-    return NextResponse.json({ error: "Failed to send OTP" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to send OTP. Check EMAIL_* env on Vercel." },
+      { status: 500 }
+    );
   }
 }

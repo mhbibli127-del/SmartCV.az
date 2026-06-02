@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import { motion } from "framer-motion";
 import { TemplateCard } from "@/components/templates/TemplateCard";
 import {
   EDITOR_TEMPLATES,
@@ -13,6 +12,8 @@ import type { CoreTemplateCategory } from "@/lib/design-engine/core-templates";
 import type { CvEditorTemplate } from "@/types/cv-editor";
 import { useAnalytics } from "@/lib/analytics";
 import { cn } from "@/lib/utils";
+import { PageHeader, PageShell } from "@/components/ui/page-shell";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 import { preloadImage } from "@/lib/wait-for-images";
 import { getTemplatePreviewSrc } from "@/lib/cv-editor/template-base-layer";
 import { clearEntireEditorState } from "@/lib/template-engine/reset";
@@ -32,6 +33,7 @@ const CATEGORIES: Array<CoreTemplateCategory | "All"> = [
 ];
 
 export default function TemplatesPage() {
+  const { t } = useLanguage();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<CoreTemplateCategory | "All">("All");
@@ -61,26 +63,19 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8 pb-12">
-      <header className="space-y-2">
-        <motion.h1
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-2xl font-semibold tracking-tight text-zinc-900 md:text-3xl"
-        >
-          CV Templates
-        </motion.h1>
-        <p className="max-w-xl text-sm text-zinc-500">
-          Professional, recruiter-ready designs. Pick a template and edit in our Canva-style builder.
-        </p>
-      </header>
+    <PageShell className="pb-12">
+      <PageHeader
+        eyebrow="Studio"
+        title={t("templates.title")}
+        description={t("templates.description")}
+      />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative max-w-md flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
             type="search"
-            placeholder="Search templates…"
+            placeholder={t("templates.search")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="h-11 w-full rounded-xl border border-zinc-200 bg-white pl-10 pr-4 text-sm transition focus:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-zinc-900/5"
@@ -119,7 +114,7 @@ export default function TemplatesPage() {
 
       {filtered.length === 0 && (
         <div className="rounded-2xl border border-dashed border-zinc-200 py-20 text-center text-sm text-zinc-500">
-          No templates match your search.
+          {t("templates.empty")}
         </div>
       )}
 
@@ -131,6 +126,6 @@ export default function TemplatesPage() {
           openEditor(t);
         }}
       />
-    </div>
+    </PageShell>
   );
 }

@@ -141,3 +141,14 @@ model CVSample {
   @@index([language])
   @@index([industry, seniority, language])
 }
+
+/** Email OTP codes for registration / verification (Vercel-safe; not filesystem). */
+model EmailOtp {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}

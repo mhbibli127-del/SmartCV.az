@@ -5,8 +5,10 @@ import { ArrowRight, ShieldCheck } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useLanguage } from "@/components/i18n/LanguageProvider";
 
 function VerifyOtpContent() {
+  const { t } = useLanguage();
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
@@ -87,7 +89,7 @@ function VerifyOtpContent() {
 
     const fullOtp = otp.join("");
     if (fullOtp.length !== 6) {
-      setError("Təsdiq kodunu tam daxil edin.");
+      setError(t("auth.otpIncomplete"));
       return;
     }
 
@@ -132,12 +134,18 @@ function VerifyOtpContent() {
       const data = await res.json();
 
       if (res.ok) {
+        const devPart =
+          data.devCode != null
+            ? ` Kod: ${data.devCode}`
+            : data.devMode
+              ? ` ${t("auth.otp_dev")}`
+              : "";
         setMessage(
-          data.devMode
-            ? "Yeni kod göndərildi! (Tərtibatçı rejimi: Kod terminala yazdırıldı)"
-            : "Yeni təsdiq kodu e-mailinizə göndərildi."
+          data.devMode || data.devCode
+            ? `${t("auth.otp_sent")}${devPart}`
+            : t("auth.otp_sent")
         );
-        setTimer(300); // reset countdown
+        setTimer(300);
         inputRefs.current[0]?.focus();
       } else {
         setError(data.error || "Kodu yenidən göndərmək mümkün olmadı.");
@@ -150,9 +158,8 @@ function VerifyOtpContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#fafafa] flex items-center justify-center px-6">
+    <div className="flex min-h-[calc(100vh-5rem)] items-center justify-center px-6 py-8">
       <div className="w-full max-w-6xl grid md:grid-cols-2 gap-16 items-center">
-        {/* Left Marketing Banner */}
         <motion.div
           initial={{ opacity: 0, x: -40 }}
           animate={{ opacity: 1, x: 0 }}
@@ -160,19 +167,17 @@ function VerifyOtpContent() {
           className="space-y-8"
         >
           <h1 className="text-5xl md:text-6xl font-semibold leading-tight tracking-tight">
-            Hesabınızın <br />
-            <span className="text-gray-400">təhlükəsizliyi</span> <br />
-            bizim üçün önəmlidir.
+            {t("auth.verifyBanner1")} <br />
+            <span className="text-gray-400">{t("auth.verifyBanner2")}</span> <br />
+            {t("auth.verifyBanner3")}
           </h1>
 
-          <p className="text-lg text-gray-600 max-w-md">
-            E-mail ünvanınıza göndərilən 6 rəqəmli OTP təsdiq kodunu daxil edərək dərhal panelə daxil olun.
-          </p>
+          <p className="text-lg text-gray-600 max-w-md">{t("auth.verifyBannerSub")}</p>
 
-          <div className="flex gap-6 text-sm text-gray-500">
-            <span>🛡️ Təhlükəsiz Giriş</span>
-            <span>⏱️ 5 dəqiqə limit</span>
-            <span>⚡ Sürətli Yoxlama</span>
+          <div className="flex flex-wrap gap-4 text-sm text-gray-500">
+            <span>{t("auth.secureLogin")}</span>
+            <span>{t("auth.timerLimit")}</span>
+            <span>{t("auth.fastCheck")}</span>
           </div>
         </motion.div>
 
@@ -190,9 +195,9 @@ function VerifyOtpContent() {
               </div>
             </div>
 
-            <h2 className="text-2xl font-semibold text-center mb-1">Təsdiq Kodu</h2>
+            <h2 className="text-2xl font-semibold text-center mb-1">{t("auth.verifyTitle")}</h2>
             <p className="text-sm text-gray-500 text-center mb-6">
-              Kod <strong>{email}</strong> ünvanına göndərildi
+              {t("auth.verifySub")}: <strong>{email}</strong>
             </p>
 
             {error && (
@@ -250,14 +255,14 @@ function VerifyOtpContent() {
                 disabled={isLoading || otp.join("").length !== 6}
                 className="w-full bg-black text-white py-3.5 rounded-xl text-base font-medium flex items-center justify-center gap-2 hover:bg-gray-900 transition disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                {isLoading ? "Yoxlanılır..." : "Təsdiqlə"}
+                {isLoading ? t("auth.signingIn") : t("auth.verify")}
                 <ArrowRight size={18} />
               </button>
             </form>
 
             {/* Resend Actions */}
             <div className="mt-6 flex flex-col items-center gap-2 text-sm text-gray-500">
-              <span>Kodu almadınız?</span>
+              <span>{t("auth.resend")}?</span>
               <button
                 onClick={handleResend}
                 disabled={isLoading || timer > 240}

@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createOrUpdateUser } from "@/lib/users";
 import { signSessionToken } from "@/lib/token";
 import { generateOTP } from "@/lib/otp";
-import { getLocalDb, saveLocalDb } from "@/lib/db";
+import { saveOtp } from "@/lib/otp-store";
 import { sendOtpEmail } from "@/lib/email";
+import { validateRegisterForm, authIssueToMessage } from "@/lib/auth-validation";
 import {
   cookieSecureFromRequest,
   setAuthStateCookie,
@@ -27,22 +28,30 @@ export async function POST(request: NextRequest) {
     const body = (await request.json().catch(() => ({}))) as {
       email?: string;
       password?: string;
+      confirmPassword?: string;
       name?: string;
     };
     const email = body.email?.trim().toLowerCase();
     const password = body.password ?? "";
+    const confirmPassword = body.confirmPassword ?? password;
     const name = body.name?.trim() || "User";
 
-    if (!email || !password) {
+    const validationIssues = validateRegisterForm({
+      name,
+      email: email ?? "",
+      password,
+      confirmPassword,
+    });
+    if (validationIssues.length > 0) {
       return NextResponse.json(
-        { error: "Email and password are required" },
+        { error: authIssueToMessage(validationIssues[0]!) },
         { status: 400 }
       );
     }
 
-    if (password.length < 6) {
+    if (!email || !password) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        { error: "Email and password are required" },
         { status: 400 }
       );
     }
@@ -52,15 +61,16 @@ export async function POST(request: NextRequest) {
     // Generate + persist OTP and dispatch the email immediately so the user
     // sees their code on the next screen without an extra "send" click.
     let otpDelivery: "sent" | "failed" = "sent";
+    let devCode: string | undefined;
     try {
       const code = generateOTP();
-      const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
-      const otps = getLocalDb().filter((o) => o.email !== email);
-      saveLocalDb([...otps, { email, code, expiresAt }]);
-      await sendOtpEmail(email, code);
+      await saveOtp(email, code);
+      const delivery = await sendOtpEmail(email, code);
+      if (process.env.NODE_ENV === "development" && delivery.method === "console") {
+        devCode = code;
+      }
     } catch (err) {
       otpDelivery = "failed";
-      // eslint-disable-next-line no-console
       console.error("[register] OTP dispatch failed:", err);
     }
 
@@ -75,6 +85,7 @@ export async function POST(request: NextRequest) {
       message: "User registered. Please verify the code we sent to your email.",
       otpDelivery,
       redirect: `/verify-otp?email=${encodeURIComponent(email)}`,
+      ...(devCode ? { devCode } : {}),
     });
 
     response.cookies.set(

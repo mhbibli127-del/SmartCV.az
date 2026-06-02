@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkUserCredentials } from "@/lib/users";
 import { signSessionToken } from "@/lib/token";
 import { generateOTP } from "@/lib/otp";
-import { getLocalDb, saveLocalDb } from "@/lib/db";
+import { saveOtp } from "@/lib/otp-store";
 import { sendOtpEmail } from "@/lib/email";
 import { setAuthStateCookie, cookieSecureFromRequest, sessionCookieOptions } from "@/lib/auth-cookie";
 import { handleApiError, tooManyRequests } from "@/lib/api-errors";
@@ -42,9 +42,7 @@ export async function POST(req: NextRequest) {
         // Send a fresh OTP so the user can complete verification.
         try {
           const code = generateOTP();
-          const expiresAt = new Date(Date.now() + 5 * 60_000).toISOString();
-          const otps = getLocalDb().filter((o) => o.email !== email);
-          saveLocalDb([...otps, { email, code, expiresAt }]);
+          await saveOtp(email, code);
           await sendOtpEmail(email, code);
         } catch (err) {
           // eslint-disable-next-line no-console
