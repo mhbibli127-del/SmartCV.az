@@ -330,11 +330,13 @@ export function getNextAuthUrl(): string {
     return fallback;
   }
 
-  const vercelUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL.replace(/\/$/, "")}`
+  const env = process.env;
+  const vercelUrl = env.VERCEL_URL
+    ? `https://${env.VERCEL_URL.replace(/\/$/, "")}`
     : null;
-  const nextAuth = process.env.NEXTAUTH_URL?.trim().replace(/\/$/, "");
-  const publicUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
+  const nextAuth = env.NEXTAUTH_URL?.trim().replace(/\/$/, "");
+  // Dynamic key — avoids Next build inlining NEXT_PUBLIC_* as string literals in this module.
+  const publicUrl = env["NEXT_PUBLIC_APP_URL"]?.trim().replace(/\/$/, "");
 
   // On Vercel, a leftover localhost NEXTAUTH_URL causes redirect_uri_mismatch.
   if (nextAuth && !isLocalhostUrl(nextAuth)) return nextAuth;
@@ -352,13 +354,9 @@ export function getNextAuthUrl(): string {
 export function ensureAuthUrlForDeployment(): string {
   const resolved = getNextAuthUrl();
   if (process.env.NODE_ENV !== "development") {
-    process.env.NEXTAUTH_URL = resolved;
-    if (
-      !process.env.NEXT_PUBLIC_APP_URL?.trim() ||
-      isLocalhostUrl(process.env.NEXT_PUBLIC_APP_URL)
-    ) {
-      process.env.NEXT_PUBLIC_APP_URL = resolved;
-    }
+    // Runtime assign only — never assign NEXT_PUBLIC_* (Next inlines those at build → syntax error).
+    const env = process.env;
+    env.NEXTAUTH_URL = resolved;
   }
   return resolved;
 }
